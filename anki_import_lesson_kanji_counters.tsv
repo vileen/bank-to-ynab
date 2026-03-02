@@ -1,0 +1,138 @@
+Kanji/Counter	Reading	Meaning	Example	tags
+見	み・miru, ケン・ken	widzieć	見つける (mitsukeru - znaleźć)	lesson
+火	ひ・hi, カ・ka	ogień	火曜日 (kayōbi - wtorek)	lesson
+木	き・ki, モク・moku	drzewo	木曜日 (mokuyōbi - czwartek)	lesson
+日	ひ・hi, ニチ・nichi	dzień/słońce	日曜日 (nichiyōbi - niedziela)	lesson
+英	エイ・ei	Anglia/English	英語 (eigo - język angielski)	lesson
+語	ゴ・go	język/słowo	日本語 (nihongo - język japoński)	lesson
+上	うえ・ue, ジョウ・jō	powyżej/na/góra	上に (ue ni - na górze)	lesson
+下	した・shita, カ・ka	poniżej/pod/dół	下に (shita ni - na dole)	lesson
+中	なか・naka, チュウ・chū	wewnątrz/środek	中学校 (chūgakkō - szkoła średnia)	lesson
+写	シャ・sha	fotografować	写真 (shashin - zdjęcie)	lesson
+真	シン・shin	prawda	写真 (shashin - zdjęcie)	lesson
+窓	まど・mado	okno	窓 (mado - okno)	lesson
+風	ふう・fū, フー・fū	wiatr/styl	お風呂 (ofuro - kąpiel)	lesson
+飛	と・to, ヒ・hi	latać/skakać	飛行機 (hikōki - samolot)	lesson
+行	い・i, コウ・kō	iść/działać	飛行機 (hikōki - samolot)	lesson
+機	き・ki, キ・ki	maszyna	飛行機 (hikōki - samolot)	lesson
+鏡	かがみ・kagami	lustro	鏡 (kagami - lustro)	lesson
+歯	は・ha, シ・shi	ząb	歯ブラシ (haburashi - szczoteczka)	lesson
+一	いち・ichi, イチ・ichi	jeden	一番 (ichiban - numer jeden)	lesson
+番	ばん・ban, バン・ban	numer/kolej	番号 (bangō - numer)	lesson
+好	す・su, コウ・kō	lubić	好き (suki - lubić)	lesson
+美	ビ・bi	piękny	美味しい (oishii - pyszny)	lesson
+味	あじ・aji, ミ・mi	smak	味 (aji - smak)	lesson
+高	たか・taka, コウ・kō	wysoki/drogi	高い (takai - wysoki)	lesson
+安	やす・yasu, アン・an	tani/bezpieczny	安い (yasui - tani)	lesson
+曜	ヨウ・yō	dzień tygodnia	曜日 (yōbi - dzień tygodnia)	lesson
+昨	きのう・kinō, サク・saku	wczorajszy	昨日 (kinō - wczoraj)	lesson
+今	きょう・kyō, いま・ima	teraz/dzisiaj	今日 (kyō - dzisiaj)	lesson
+明	あした・ashita, メイ・mei	jasny/jutro	明日 (ashita - jutro)	lesson
+去	きょ・kyo	miniony	去年 (kyonen - zeszły rok)	lesson
+来	らい・rai	przyjść/przyszły	来年 (rainen - przyszły rok)	lesson
+月	つき・tsuki, ゲツ・getsu	księżyc/miesiąc	月曜日 (getsuyōbi - poniedziałek)	days
+火	ひ・hi, カ・ka	ogień	火曜日 (kayōbi - wtorek)	days
+水	みず・mizu, スイ・sui	woda	水曜日 (suiyōbi - środa)	days
+木	き・ki, モク・moku	drzewo	木曜日 (mokuyōbi - czwartek)	days
+金	かね・kane, キン・kin	metal/pieniądze	金曜日 (kin'yōbi - piątek)	days
+土	つち・tsuchi, ド・do	ziemia	土曜日 (doyōbi - sobota)	days
+日	ひ・hi, ニチ・nichi	słońce/dzień	日曜日 (nichiyōbi - niedziela)	days
+曜	ヨウ・yō	dzień tygodnia	月〜日曜日 (pon-niedziela)	days
+一つ	ひとつ	jedna rzecz	一つください (hitotsu kudasai - poproszę jedno)	counters
+二つ	ふたつ	dwie rzeczy	二つあります (futatsu arimasu - są dwie)	counters
+三つ	みっつ	trzy rzeczy	三つです (mittsu desu - to trzy)	counters
+四つ	よっつ	cztery rzeczy	四つください (yottsu kudasai - poproszę cztery)	counters
+五つ	いつつ	pięć rzeczy	五つあります (itsutsu arimasu - jest pięć)	counters
+六つ	むっつ	sześć rzeczy	六つです (muttsu desu - to sześć)	counters
+七つ	nななつ	siedem rzeczy	七つください (nanatsu kudasai)	counters
+八つ	やっつ	osiem rzeczy	八つあります (yattsu arimasu)	counters
+九つ	ここのつ	dziewięć rzeczy	九つです (kokonotsu desu)	counters
+十	とお	dziesięć rzeczy	十あります (tō arimasu)	counters
+一人	hitori	jedna osoba	一人で (hitori de - samemu)	counters_people
+二人	futari	dwie osoby	二人とも (futari tomo - oboje)	counters_people
+三人	sannin	trzy osoby	三人います (sannin imasu)	counters_people
+四人	yonin	cztery osoby	四人です (yonin desu)	counters_people
+五人	gonin	pięć osób	五人で (gonin de - w piątkę)	counters_people
+六人	ronkunin	sześć osób	六人います (rokunin imasu)	counters_people
+七人	nananin	siedem osób	七人です (nananin desu)	counters_people
+八人	hachinin	osiem osób	八人います (hachinin imasu)	counters_people
+九人	kyūnin	dziewięć osób	九人です (kyūnin desu)	counters_people
+十人	jūnin	dziesięć osób	十人います (jūnin imasu)	counters_people
+一杯	ippai	jeden kieliszek	一杯の水 (ippai no mizu - szklanka wody)	counters_drinks
+二杯	nihai	dwie szklanki	二杯のコーヒー (nihai no kōhī)
+counters_drinks
+三杯	sanbai	trzy szklanki	三杯のお茶 (sanbai no ocha)
+counters_drinks
+四杯	yonhai	cztery szklanki	四杯のビール (yonhai no bīru)
+counters_drinks
+五杯	gohai	pięć szklanek	五杯のジュース (gohai no jūsu)
+counters_drinks
+六杯	ronppai	sześć szklanek	六杯の水 (ronppai no mizu)
+counters_drinks
+七杯	nanahai	siedem szklanek	七杯の紅茶 (nanahai no kōcha)
+counters_drinks
+八杯	happai	osiem szklanek	八杯のコーラ (happai no kōra)
+counters_drinks
+九杯	kyūhai	dziewięć szklanek	九杯のお酒 (kyūhai no osake)
+counters_drinks
+十杯	juppai	dziesięć szklanek	十杯の水 (juppai no mizu)
+counters_drinks
+一本	ippon	jedna długa rzecz	一本の鉛筆 (ippon no enpitsu - ołówek)
+counters_long
+二本	nihon	dwie długie rzeczy	二本のペン (nihon no pen)
+counters_long
+三本	sanbon	trzy długie rzeczy	三本の鉛筆 (sanbon no enpitsu)
+counters_long
+四本	yonhon	cztery długie rzeczy	四本のろうそく (yonhon no rōsoku)
+counters_long
+五本	gohon	pięć długich rzeczy	五本のペン (gohon no pen)
+counters_long
+六本	ronpbon	sześć długich rzeczy	六本の鉛筆 (ronpbon no enpitsu)
+counters_long
+七本	nanahon	siedem długich rzeczy	七本の傘 (nanahon no kasa)
+counters_long
+八本	happon	osiem długich rzeczy	八本のペン (happon no pen)
+counters_long
+九本	kyūhon	dziewięć długich rzeczy	九本の鉛筆 (kyūhon no enpitsu)
+counters_long
+十本	juppon	dziesięć długich rzeczy	十本のペン (juppon no pen)
+counters_long
+一枚	ichimai	jedna płaska rzecz	一枚の紙 (ichimai no kami - arkusz)
+counters_flat
+二枚	nimai	dwie płaskie rzeczy	二枚の切手 (nimai no kitte - znaczki)
+counters_flat
+三枚	sanmai	trzy płaskie rzeczy	三枚のシャツ (sanmai no shatsu)
+counters_flat
+四枚	yonmai	cztery płaskie rzeczy	四枚の写真 (yonmai no shashin)
+counters_flat
+五枚	gomai	pięć płaskich rzeczy	五枚の紙 (gomai no kami)
+counters_flat
+六枚	ronmai	sześć płaskich rzeczy	六枚の切手 (ronmai no kitte)
+counters_flat
+七枚	nanamai	siedem płaskich rzeczy	七枚のシャツ (nanamai no shatsu)
+counters_flat
+八枚	hachimai	osiem płaskich rzeczy	八枚の写真 (hachimai no shashin)
+counters_flat
+九枚	kyūmai	dziewięć płaskich rzeczy	九枚の紙 (kyūmai no kami)
+counters_flat
+十枚	jūmai	dziesięć płaskich rzeczy	十枚の切手 (jūmai no kitte)
+counters_flat
+一時間	ichijikan	jedna godzina	一時間かかる (zajmuje godzinę)	counters_hours
+二時間	nijikan	dwie godziny	二時間勉強した (uczyłem się 2h)
+counters_hours
+三時間	sanjikan	trzy godziny	三時間待った (czekałem 3h)
+counters_hours
+四時間	yojikan	cztery godziny	四時間働く (pracuję 4h)
+counters_hours
+五時間	gojikan	pięć godzin	五時間かかる (zajmuje 5h)
+counters_hours
+六時間	ronjikan	sześć godzin	六時間寝た (spałem 6h)
+counters_hours
+七時間	nanajikan	siedem godzin	七時間勉強した (7h nauki)
+counters_hours
+八時間	hachijikan	osiem godzin	八時間働く (pracuję 8h)
+counters_hours
+九時間	kyūjikan	dziewięć godzin	九時間待った (9h czekania)
+counters_hours
+十時間	jūjikan	dziesięć godzin	十時間かかる (zajmuje 10h)
+counters_hours
