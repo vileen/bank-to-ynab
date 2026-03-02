@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Santander → YNAB Importer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #e94560; margin-bottom: 10px; }
+        .subtitle { color: #888; margin-bottom: 20px; }
+        .card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .upload-area {
+            border: 2px dashed #e94560;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background: rgba(233, 69, 96, 0.1);
+        }
+        input[type="file"] { display: none; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: #0f3460;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value { font-size: 24px; font-weight: bold; color: #e94560; }
+        .stat-label { font-size: 12px; color: #888; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th { color: #e94560; font-weight: 600; }
+        tr:hover { background: rgba(233, 69, 96, 0.05); }
+        .category {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .cat-groceries { background: #2ecc71; color: #000; }
+        .cat-shopping { background: #3498db; color: #fff; }
+        .cat-fuel { background: #e74c3c; color: #fff; }
+        .cat-transport { background: #9b59b6; color: #fff; }
+        .cat-subscriptions { background: #f39c12; color: #000; }
+        .cat-personal { background: #1abc9c; color: #000; }
+        .cat-shipping { background: #95a5a6; color: #000; }
+        .cat-uncategorized { background: #e94560; color: #fff; }
+        .btn {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: opacity 0.3s;
+        }
+        .btn:hover { opacity: 0.8; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .filter-bar {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        .filter-bar input, .filter-bar select {
+            background: #0f3460;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        .hidden { display: none; }
+        .last-import {
+            background: #0f3460;
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        .last-import strong { color: #e94560; }
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #e94560;
+        }
+    </style>
+</head>
+<body>
+    <h1>🏦 Santander → YNAB Importer</h1>
+    <p class="subtitle">Importuj transakcje z kategorizacją do YNAB</p>
+
+    <div class="card">
+        <div class="last-import" id="lastImport">
+            📅 Ostatni import: <strong>brak danych</strong>
+        </div>
+        
+        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+            <h3>📁 Kliknij lub przeciągnij plik CSV</h3>
+            <p>Obsługuje eksport z Santander internet</p>
+            <input type="file" id="fileInput" accept=".csv" onchange="handleFile(event)">
+        </div>
+    </div>
+
+    <div id="results" class="hidden">
+        <div class="card">
+            <h3>📊 Podsumowanie</h3>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value" id="totalCount">0</div>
+                    <div class="stat-label">Transakcje</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="totalAmount">0 PLN</div>
+                    <div class="stat-label">Suma wydatków</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="newCount">0</div>
+                    <div class="stat-label">Nowe (po dacie)</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="categorizedCount">0</div>
+                    <div class="stat-label">Skategoryzowane</div>
+                </div>
+            </div>
+
+            <div class="filter-bar">
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="onlyNew" checked onchange="filterTransactions()">
+                    <span>Pokaż tylko nowe transakcje</span>
+                </label>
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="onlyExpenses" checked onchange="filterTransactions()">
+                    <span>Tylko wydatki (bez spłat)</span>
+                </label>
+                <select id="categoryFilter" onchange="filterTransactions()">
+                    <option value="all">Wszystkie kategorie</option>
+                </select>
+            </div>
+
+            <button class="btn" onclick="exportToYNAB()">📥 Eksportuj do YNAB CSV</button>
+        </div>
+
+        <div class="card">
+            <h3>📋 Lista transakcji</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Payee</th>
+                        <th>Kwota</th>
+                        <th>Kategoria</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsTable"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Category rules
+        const CATEGORY_RULES = [
+            { pattern: /lidl|stokrotka|auchan|żabka|transgourmet/i, name: 'Groceries', class: 'cat-groceries' },
+            { pattern: /orlen/i, name: 'Fuel', class: 'cat-fuel' },
+            { pattern: /mpk/i, name: 'Transport', class: 'cat-transport' },
+            { pattern: /youtube|spotify|discord|audioteka|netflix|hbo|prime/i, name: 'Subscriptions', class: 'cat-subscriptions' },
+            { pattern: /trychodiet|damian nizio|super.pharm|eubiosis/i, name: 'Personal Care', class: 'cat-personal' },
+            { pattern: /allegro|amazon|morele|iherb|bulk/i, name: 'Shopping', class: 'cat-shopping' },
+            { pattern: /poczta polska/i, name: 'Shipping', class: 'cat-shipping' },
+            { pattern: /spłata|należność/i, name: 'Payment', class: 'cat-uncategorized' },
+        ];
+
+        let allTransactions = [];
+        let filteredTransactions = [];
+
+        // Load last import date
+        const lastImportDate = localStorage.getItem('santanderLastImport');
+        if (lastImportDate) {
+            document.getElementById('lastImport').innerHTML = 
+                `📅 Ostatni import: <strong>${lastImportDate}</strong>`;
+        }
+
+        function categorize(payee) {
+            for (const rule of CATEGORY_RULES) {
+                if (rule.pattern.test(payee)) {
+                    return rule;
+                }
+            }
+            return { name: 'Uncategorized', class: 'cat-uncategorized' };
+        }
+
+        function parseAmount(amountStr) {
+            // Format: "-125,99" or "125,99"
+            const clean = amountStr.replace(/\s/g, '').replace(',', '.');
+            return parseFloat(clean);
+        }
+
+        function parseDate(dateStr) {
+            // Format: DD-MM-YYYY
+            const parts = dateStr.split('-');
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSV(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            allTransactions = [];
+
+            for (const line of lines) {
+                // Santander format: data_ks, data_op, opis, waluta, kwota, ...
+                const cols = line.split(',');
+                if (cols.length < 6) continue;
+
+                const bookingDate = cols[0]?.trim();
+                const opDate = cols[1]?.trim();
+                const payee = cols[2]?.trim();
+                const amountStr = cols[4]?.trim();
+
+                if (!payee || !amountStr) continue;
+
+                const amount = parseAmount(amountStr);
+                const date = parseDate(bookingDate);
+
+                // Skip empty/invalid
+                if (isNaN(amount) || isNaN(date.getTime())) continue;
+
+                const category = categorize(payee);
+
+                allTransactions.push({
+                    date: date,
+                    dateStr: formatDate(date),
+                    bookingDate: bookingDate,
+                    payee: payee,
+                    amount: amount,
+                    category: category,
+                    isExpense: amount < 0 && !category.name.includes('Payment'),
+                    isPayment: category.name === 'Payment' || /spłata/i.test(payee)
+                });
+            }
+
+            // Sort by date descending
+            allTransactions.sort((a, b) => b.date - a.date);
+
+            filterTransactions();
+            document.getElementById('results').classList.remove('hidden');
+            updateStats();
+        }
+
+        function filterTransactions() {
+            const onlyNew = document.getElementById('onlyNew').checked;
+            const onlyExpenses = document.getElementById('onlyExpenses').checked;
+            const categoryFilter = document.getElementById('categoryFilter').value;
+
+            const cutoffDate = lastImportDate ? new Date(lastImportDate) : new Date(0);
+
+            filteredTransactions = allTransactions.filter(t => {
+                if (onlyNew && t.date <= cutoffDate) return false;
+                if (onlyExpenses && (t.isPayment || t.amount > 0)) return false;
+                if (categoryFilter !== 'all' && t.category.name !== categoryFilter) return false;
+                return true;
+            });
+
+            renderTable();
+            updateStats();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('transactionsTable');
+            tbody.innerHTML = '';
+
+            for (const t of filteredTransactions.slice(0, 100)) { // Limit to 100 for performance
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${t.dateStr}</td>
+                    <td>${t.payee.substring(0, 50)}</td>
+                    <td style="color: ${t.amount < 0 ? '#e94560' : '#2ecc71'}">${t.amount.toFixed(2)} PLN</td>
+                    <td><span class="category ${t.category.class}">${t.category.name}</span></td>
+                `;
+                tbody.appendChild(row);
+            }
+
+            if (filteredTransactions.length > 100) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="4" style="text-align:center;color:#888">... i ${filteredTransactions.length - 100} więcej</td>`;
+                tbody.appendChild(row);
+            }
+        }
+
+        function updateStats() {
+            const expenses = allTransactions.filter(t => t.amount < 0 && !t.isPayment);
+            const total = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+            
+            const cutoffDate = lastImportDate ? new Date(lastImportDate) : new Date(0);
+            const newTransactions = allTransactions.filter(t => t.date > cutoffDate && t.amount < 0 && !t.isPayment);
+            
+            const categorized = allTransactions.filter(t => t.category.name !== 'Uncategorized').length;
+
+            document.getElementById('totalCount').textContent = allTransactions.length;
+            document.getElementById('totalAmount').textContent = total.toFixed(0) + ' PLN';
+            document.getElementById('newCount').textContent = newTransactions.length;
+            document.getElementById('categorizedCount').textContent = categorized;
+
+            // Update category filter options
+            const categories = [...new Set(allTransactions.map(t => t.category.name))];
+            const select = document.getElementById('categoryFilter');
+            select.innerHTML = '<option value="all">Wszystkie kategorie</option>';
+            categories.forEach(cat => {
+                select.innerHTML += `<option value="${cat}">${cat}</option>`;
+            });
+        }
+
+        function exportToYNAB() {
+            // YNAB CSV format: Date,Payee,Memo,Amount
+            let csv = 'Date,Payee,Memo,Amount\n';
+            
+            for (const t of filteredTransactions) {
+                const payee = t.payee.replace(/"/g, '""');
+                csv += `${t.dateStr},"${payee}",,${t.amount.toFixed(2)}\n`;
+            }
+
+            // Download
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `ynab_import_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+
+            // Save last import date
+            if (filteredTransactions.length > 0) {
+                const newestDate = filteredTransactions[0].dateStr;
+                localStorage.setItem('santanderLastImport', newestDate);
+                document.getElementById('lastImport').innerHTML = 
+                    `📅 Ostatni import: <strong>${newestDate}</strong> (zapisano)`;
+            }
+
+            alert(`✅ Wyeksportowano ${filteredTransactions.length} transakcji!`);
+        }
+
+        // Allow drag and drop
+        document.querySelector('.upload-area').addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.currentTarget.style.background = 'rgba(233, 69, 96, 0.2)';
+        });
+
+        document.querySelector('.upload-area').addEventListener('dragleave', (e) => {
+            e.currentTarget.style.background = '';
+        });
+
+        document.querySelector('.upload-area').addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.currentTarget.style.background = '';
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                document.getElementById('fileInput').files = files;
+                handleFile({ target: { files: files } });
+            }
+        });
+    </script>
+</body>
+</html>
