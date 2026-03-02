@@ -1,11 +1,11 @@
 {
-  "name": "santander-to-ynab",
+  "name": "bank-to-ynab",
   "version": "1.0.0",
-  "description": "Import Santander PL transactions to YNAB with auto-categorization",
-  "main": "importer.html",
+  "description": "Import bank transactions from Polish banks to YNAB with auto-categorization",
+  "main": "index.html",
   "scripts": {
     "build": "echo 'No build needed - static HTML'",
     "deploy": "gh-pages -d ."
   },
-  "homepage": "https://vileen.github.io/santander-to-ynab"
+  "homepage": "https://vileen.github.io/bank-to-ynab"
 }
