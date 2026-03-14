@@ -279,10 +279,10 @@ app.post('/api/transactions/cleanup', async (req, res) => {
 });
 
 // Health check
-app.get('/api/health', (req, res) => {
+app.get('/api/health', async (req, res) => {
   try {
-    // Test database connection - SQLite is synchronous
-    db.db.prepare('SELECT 1').get();
+    // Test database connection
+    await db.pool.query('SELECT 1');
     
     res.json({ 
       status: 'ok', 
