@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Parsera Santander CSV</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 { color: #e94560; margin-bottom: 10px; }
+        .test-result { 
+            background: #16213e; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 8px;
+            border-left: 4px solid;
+        }
+        .test-pass { border-color: #2ecc71; }
+        .test-fail { border-color: #e74c3c; }
+        .test-info { border-color: #3498db; }
+        pre { 
+            background: #0f3460; 
+            padding: 10px; 
+            border-radius: 4px; 
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        .debug-row {
+            background: #0f3460;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Parsera Santander CSV</h1>
+    <p>Anonimizowane dane testowe (27 wierszy transakcji)</p>
+    
+    <div id="results"></div>
+
+    <script>
+        // Anonimizowany plik CSV (taka sama struktura, zmienione dane)
+        const TEST_CSV = `2026-03-15,02-03-2026,'54 1090 1489 4000 0001 2762 8024,ANONIM TESTOWY UL. TESTOWA 1 00-001 WARSZAWA,PLN,"4,30","0,00",27,
+13-03-2026,11-03-2026,Google YouTube Member London GB,,,"-9,99","0,00",1,
+13-03-2026,11-03-2026,ZABKA Z1234 K.1 WARSZAWA PL,,,"-92,38","0,00",2,
+12-03-2026,10-03-2026,Allegro Poznan PL,,,"-121,07","0,00",3,
+12-03-2026,10-03-2026,LIDL 1234 WARSZAWA PL,,,"-40,97","0,00",4,
+11-03-2026,09-03-2026,Allegro Poznan PL,,,"-85,74","0,00",5,
+11-03-2026,09-03-2026,LIDL UL.TESTOWA WARSZAWA PL,,,"-22,42","0,00",6,
+11-03-2026,09-03-2026,MPK WARSZAWA WARSZAWA PL,,,"-3,80","0,00",7,
+10-03-2026,08-03-2026,Allegro Poznan PL,,,"-49,80","0,00",8,
+09-03-2026,08-03-2026,PLAYSTATION Hilversum NL,,,"-69,00","0,00",9,
+09-03-2026,07-03-2026,ZABKA Z1234 K.1 WARSZAWA PL,,,"-79,98","0,00",10,
+09-03-2026,07-03-2026,Allegro Poznan PL,,,"-84,99","0,00",11,
+09-03-2026,07-03-2026,AUCHAN POLSKA SP. Z 02 WARSZAWA PL,,,"-161,37","0,00",12,
+09-03-2026,06-03-2026,STOKROTKA NR 0123 WARSZAWA PL,,,"-38,97","0,00",13,
+09-03-2026,06-03-2026,LIDL 1234 WARSZAWA PL,,,"-77,83","0,00",14,
+09-03-2026,06-03-2026,Allegro Poznan PL,,,"-743,83","0,00",15,
+09-03-2026,05-03-2026,ebok.test.pl Warszawa PL,,,"-2476,23","0,00",16,
+09-03-2026,05-03-2026,ZABKA Z1234 K.1 WARSZAWA PL,,,"-39,99","0,00",17,
+06-03-2026,04-03-2026,LIDL 1234 WARSZAWA PL,,,"-30,98","0,00",18,
+04-03-2026,04-03-2026,Spłata należności - dziękujemy,Splata karty,,"4702,65","0,00",19,
+05-03-2026,03-03-2026,Amazon.pl*TEST1234 AMAZON.PL LU,,,"-63,35","0,00",20,
+05-03-2026,03-03-2026,Allegro Poznan PL,,,"-56,90","0,00",21,
+05-03-2026,03-03-2026,LIDL UL.TESTOWA WARSZAWA PL,,,"-16,81","0,00",22,
+05-03-2026,03-03-2026,ZABKA Z5678 K.1 WARSZAWA PL,,,"-42,99","0,00",23,
+04-03-2026,02-03-2026,Spotify TEST1234 Stockholm SE,,,"-23,99","0,00",24,
+04-03-2026,02-03-2026,Allegro Poznan PL,,,"-294,99","0,00",25,
+04-03-2026,02-03-2026,STOKROTKA NR 1234 WARSZAWA PL,,,"-11,98","0,00",26,
+04-03-2026,02-03-2026,MPK WARSZAWA WARSZAWA PL,,,"-4,30","0,00",27,`;
+
+        const results = document.getElementById('results');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result test-${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+
+        // Parser z aktualnej wersji
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"' || char === "'") {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
+        function parseAmount(amountStr) {
+            const clean = amountStr.replace(/\s/g, '').replace(',', '.');
+            return parseFloat(clean);
+        }
+
+        function parseDate(dateStr) {
+            const parts = dateStr.split('-');
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+
+        // Test 1: Liczba wierszy w CSV
+        log(`<strong>Test 1: Liczba wierszy w CSV</strong><br>Oczekiwane: 27 transakcji + 1 wiersz nagłówka/konta = 28 wierszy`, 'info');
+        const lines = TEST_CSV.trim().split('\n');
+        log(`Rzeczywiste: ${lines.length} wierszy`, lines.length === 28 ? 'pass' : 'fail');
+
+        // Test 2: Struktura pierwszego wiersza (konto)
+        log(`<strong>Test 2: Pierwszy wiersz (dane konta)</strong>`, 'info');
+        const firstLineCols = parseCSVLine(lines[0]);
+        log(`Kolumny w pierwszym wierszu: ${firstLineCols.length}<br>` +
+            `Col[0] (data): "${firstLineCols[0]}"<br>` +
+            `Col[2] (nr konta): "${firstLineCols[2]?.substring(0, 20)}..."<br>` +
+            `Col[3] (właściciel): "${firstLineCols[3]?.substring(0, 30)}..."`, 'info');
+
+        // Test 3: Struktura wiersza transakcji
+        log(`<strong>Test 3: Struktura wiersza transakcji (2. wiersz)</strong>`, 'info');
+        const txLineCols = parseCSVLine(lines[1]);
+        let colDebug = '';
+        for (let i = 0; i < txLineCols.length; i++) {
+            colDebug += `Col[${i}]: "${txLineCols[i]}"<br>`;
+        }
+        log(`${colDebug}`, 'info');
+
+        // Test 4: Obecny parser
+        log(`<strong>Test 4: Obecny parser Santander</strong>`, 'info');
+        
+        function parseSantanderCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            const transactions = [];
+            let firstLine = true;
+            
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                
+                const cols = parseCSVLine(line);
+                
+                if (firstLine) {
+                    firstLine = false;
+                    if (cols[2]?.includes('1090') || cols[3]?.includes('ANONIM')) {
+                        continue;
+                    }
+                }
+                
+                if (cols.length < 6) continue;
+
+                const bookingDate = cols[0]?.trim();
+                const opDate = cols[1]?.trim();
+                const payee = cols[3]?.trim();
+                const amountStr = cols[5]?.trim();
+
+                if (!payee || !amountStr) {
+                    log(`Pominięto: payee="${payee}", amount="${amountStr}"`, 'info');
+                    continue;
+                }
+
+                const amount = parseAmount(amountStr);
+                const date = parseDate(bookingDate);
+
+                if (isNaN(amount) || isNaN(date.getTime())) {
+                    log(`Błąd parsowania: date="${bookingDate}", amount="${amountStr}"`, 'fail');
+                    continue;
+                }
+
+                transactions.push({
+                    date: date,
+                    payee: payee,
+                    amount: amount
+                });
+            }
+            
+            return transactions;
+        }
+
+        const txs = parseSantanderCSV(TEST_CSV);
+        log(`Znaleziono transakcji: ${txs.length} (oczekiwane: 27)`, txs.length === 27 ? 'pass' : 'fail');
+
+        // Test 5: Poprawny parser (z fixem)
+        log(`<strong>Test 5: Poprawiony parser (payee w col[2])</strong>`, 'info');
+        
+        function parseSantanderCSVFixed(csvText) {
+            const lines = csvText.trim().split('\n');
+            const transactions = [];
+            let firstLine = true;
+            
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                
+                const cols = parseCSVLine(line);
+                
+                if (firstLine) {
+                    firstLine = false;
+                    // Skip account holder line
+                    if (cols[2]?.includes('1090') || cols[3]?.includes('ANONIM') || cols[3]?.includes('TESTOWY')) {
+                        continue;
+                    }
+                }
+                
+                if (cols.length < 6) continue;
+
+                const bookingDate = cols[0]?.trim();
+                // FIX: payee is in col[2], not col[3]
+                const payee = cols[2]?.trim();
+                // cols[3] might be empty or contain extra info
+                const amountStr = cols[5]?.trim();
+
+                if (!payee || !amountStr) {
+                    continue;
+                }
+
+                const amount = parseAmount(amountStr);
+                const date = parseDate(bookingDate);
+
+                if (isNaN(amount) || isNaN(date.getTime())) {
+                    continue;
+                }
+
+                transactions.push({
+                    date: date,
+                    payee: payee,
+                    amount: amount
+                });
+            }
+            
+            return transactions;
+        }
+
+        const txsFixed = parseSantanderCSVFixed(TEST_CSV);
+        log(`Znaleziono transakcji: ${txsFixed.length} (oczekiwane: 27)`, txsFixed.length === 27 ? 'pass' : 'fail');
+
+        // Test 6: Przykładowe dane
+        log(`<strong>Test 6: Przykładowe sparsowane transakcje</strong>`, 'info');
+        if (txsFixed.length > 0) {
+            let sample = '<table style="width:100%; font-size:12px;"><tr><th>Data</th><th>Payee</th><th>Kwota</th></tr>';
+            for (let i = 0; i < Math.min(5, txsFixed.length); i++) {
+                const tx = txsFixed[i];
+                sample += `<tr><td>${tx.date.toISOString().split('T')[0]}</td><td>${tx.payee}</td><td>${tx.amount.toFixed(2)}</td></tr>`;
+            }
+            sample += '</table>';
+            log(sample, 'info');
+        }
+
+        // Podsumowanie
+        log(`<strong>📝 Podsumowanie</strong><br>` +
+            `Problem: W obecnym parserze payee jest szukany w col[3], ale w rzeczywistości jest w col[2].<br>` +
+            `Rozwiązanie: Zmienić const payee = cols[3]?.trim(); na const payee = cols[2]?.trim();`, 
+            txsFixed.length === 27 ? 'pass' : 'fail');
+    </script>
+</body>
+</html>

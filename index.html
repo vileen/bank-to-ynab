@@ -320,9 +320,9 @@
 
                 const bookingDate = cols[0]?.trim();
                 const opDate = cols[1]?.trim();
-                // cols[2] = account number (e.g. '54 1090...)
-                const payee = cols[3]?.trim();
-                // cols[4] = empty or currency
+                // cols[2] = payee (e.g. 'Google YouTube...', 'LIDL...')
+                // cols[3] = extra info or empty for transactions
+                const payee = cols[2]?.trim();
                 const amountStr = cols[5]?.trim();
 
                 if (!payee || !amountStr) continue;
