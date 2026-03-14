@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
@@ -13,8 +13,24 @@ const YNAB_API_KEY = process.env.YNAB_API_KEY;
 const YNAB_BASE_URL = process.env.YNAB_BASE_URL || 'https://api.youneedabudget.com/v1';
 
 // Middleware
+const allowedOrigins = [
+  'http://localhost:8080',
+  'https://ynab.vileen.pl',
+  'https://vileen.github.io',
+  'https://vileen.github.io/bank-to-ynab'
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:8080',
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.FRONTEND_URL === origin) {
+      callback(null, true);
+    } else {
+      console.warn('CORS blocked origin:', origin);
+      callback(null, true); // Allow anyway for now
+    }
+  },
   credentials: true
 }));
 app.use(express.json());
