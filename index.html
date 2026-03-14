@@ -273,19 +273,57 @@
             return date.toISOString().split('T')[0];
         }
 
+        // Parse CSV line respecting quotes
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"' || char === "'") {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
         // Santander parser
         function parseSantanderCSV(csvText) {
             const lines = csvText.trim().split('\n');
             const transactions = [];
+            let firstLine = true;
             
             for (const line of lines) {
-                const cols = line.split(',');
+                // Skip empty lines
+                if (!line.trim()) continue;
+                
+                const cols = parseCSVLine(line);
+                
+                // Skip first line with account holder info
+                if (firstLine) {
+                    firstLine = false;
+                    // Check if this looks like account holder line (has account number format)
+                    if (cols[2]?.includes('1090') || cols[3]?.includes('DOMINIK')) {
+                        continue;
+                    }
+                }
+                
+                // Need at least: date, op_date, account, payee, empty, amount, balance, nr
                 if (cols.length < 6) continue;
 
                 const bookingDate = cols[0]?.trim();
                 const opDate = cols[1]?.trim();
-                const payee = cols[2]?.trim();
-                const amountStr = cols[4]?.trim();
+                // cols[2] = account number (e.g. '54 1090...)
+                const payee = cols[3]?.trim();
+                // cols[4] = empty or currency
+                const amountStr = cols[5]?.trim();
 
                 if (!payee || !amountStr) continue;
 
