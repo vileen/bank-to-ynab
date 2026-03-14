@@ -15,6 +15,8 @@
             margin: 0 auto;
         }
         h1 { color: #e94560; margin-bottom: 10px; }
+        h2 { color: #e94560; margin: 20px 0 15px; }
+        h3 { color: #ccc; margin: 15px 0 10px; }
         .subtitle { color: #888; margin-bottom: 20px; }
         .card {
             background: #16213e;
@@ -91,6 +93,10 @@
             background: #0f3460;
             color: #eee;
         }
+        .btn-success {
+            background: #2ecc71;
+            color: #000;
+        }
         .filter-bar {
             display: flex;
             gap: 15px;
@@ -131,6 +137,14 @@
         .tab:hover:not(.active) {
             color: #ccc;
         }
+        .tab .badge {
+            background: #e94560;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
         
         /* Settings panel */
         .settings-row {
@@ -154,18 +168,60 @@
             border-radius: 6px;
         }
         
-        /* Mappings */
+        /* Payee cards */
+        .payee-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .payee-card {
+            background: #0f3460;
+            border-radius: 8px;
+            padding: 15px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+        .payee-card:hover {
+            border-color: #e94560;
+        }
+        .payee-card.mapped {
+            border-left: 4px solid #2ecc71;
+        }
+        .payee-card.unmapped {
+            border-left: 4px solid #f39c12;
+        }
+        .payee-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            word-break: break-word;
+        }
+        .payee-count {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 10px;
+        }
+        .payee-category {
+            color: #2ecc71;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        
+        /* Mapping items */
+        .mapping-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
         .mapping-item {
             display: flex;
             gap: 10px;
             align-items: center;
-            padding: 10px;
+            padding: 12px;
             background: #0f3460;
-            border-radius: 6px;
-            margin-bottom: 8px;
+            border-radius: 8px;
         }
         .mapping-keyword {
-            flex: 1;
+            flex: 0 0 150px;
             font-weight: 500;
         }
         .mapping-arrow {
@@ -174,6 +230,10 @@
         .mapping-category {
             flex: 1;
             color: #2ecc71;
+        }
+        .mapping-count {
+            color: #888;
+            font-size: 12px;
         }
         .mapping-delete {
             background: #e74c3c;
@@ -192,14 +252,22 @@
             margin-top: 20px;
             padding-top: 20px;
             border-top: 1px solid #333;
+            flex-wrap: wrap;
         }
-        .add-mapping input {
-            flex: 1;
+        .add-mapping input, .add-mapping select {
             background: #0f3460;
             border: 1px solid #333;
             color: #fff;
             padding: 10px;
             border-radius: 6px;
+        }
+        .add-mapping input {
+            flex: 1;
+            min-width: 150px;
+        }
+        .add-mapping select {
+            flex: 2;
+            min-width: 200px;
         }
         
         .connection-status {
@@ -218,6 +286,30 @@
             background: rgba(231, 76, 60, 0.2);
             color: #e74c3c;
         }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .new-payees-alert {
+            background: rgba(243, 156, 18, 0.1);
+            border: 1px solid #f39c12;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
     </style>
 </head>
 <body>
@@ -230,9 +322,19 @@
     </p>
 
     <div class="tabs">
-        <button class="tab active" onclick="showTab('import')">📥 Import</button>
-        <button class="tab" onclick="showTab('mappings')">🔗 Mapowania</button>
-        <button class="tab" onclick="showTab('settings')">⚙️ Ustawienia</button>
+        <button class="tab active" onclick="showTab('import')" id="tab-import">
+            📥 Import
+        </button>
+        <button class="tab" onclick="showTab('payees')" id="tab-payees">
+            🏪 Payees
+            <span class="badge hidden" id="unmappedCount">0</span>
+        </button>
+        <button class="tab" onclick="showTab('mappings')" id="tab-mappings">
+            🔗 Mapowania
+        </button>
+        <button class="tab" onclick="showTab('settings')" id="tab-settings">
+            ⚙️ Ustawienia
+        </button>
     </div>
 
     <!-- Import Tab -->
@@ -263,40 +365,39 @@
             </label>
         </div>
 
-        <div id="resultsArea" class="hidden">
+        <div id="importResults" class="hidden">
             <div class="card">
+                <h3>📊 Wynik importu</h3>
                 <div class="stats">
                     <div class="stat-box">
-                        <div class="stat-value" id="totalCount">0</div>
+                        <div class="stat-value" id="importedCount">0</div>
                         <div class="stat-label">Transakcje</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-value" id="totalAmount">0 PLN</div>
-                        <div class="stat-label">Suma wydatków</div>
+                        <div class="stat-value" id="newPayeesCount">0</div>
+                        <div class="stat-label">Nowe payees</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-value" id="categorizedCount">0</div>
-                        <div class="stat-label">Skategoryzowane</div>
+                        <div class="stat-value" id="autoCategorizedCount">0</div>
+                        <div class="stat-label">Auto-kategorie</div>
                     </div>
                 </div>
-
-                <div class="filter-bar">
-                    <label>
-                        <input type="checkbox" id="expensesOnly" checked onchange="applyFilters()">
-                        Tylko wydatki (bez spłat)
-                    </label>
-                    <select id="categoryFilter" onchange="applyFilters()">
-                        <option value="all">Wszystkie kategorie</option>
-                    </select>
+                
+                <div id="newPayeesAlert" class="new-payees-alert hidden">
+                    <span>🆕 Znaleziono <strong id="newPayeesNum">0</strong> nowych payees bez kategorii</span>
+                    <button class="btn" onclick="showTab('payees')">Przejdź do mapowania</button>
                 </div>
-
-                <button class="btn" onclick="exportToYNAB()" id="exportBtn" disabled>
-                    📥 Eksportuj do YNAB
-                </button>
             </div>
+        </div>
 
+        <div id="transactionsArea" class="hidden">
             <div class="card">
-                <h3>📋 Lista transakcji</h3>
+                <div class="section-header">
+                    <h3>📋 Transakcje do eksportu</h3>
+                    <button class="btn" onclick="exportToYNAB()" id="exportBtn" disabled>
+                        📥 Eksportuj do YNAB
+                    </button>
+                </div>
                 <table>
                     <thead>
                         <tr>
@@ -312,23 +413,51 @@
         </div>
     </div>
 
+    <!-- Payees Tab -->
+    <div id="payeesTab" class="tab-content hidden">
+        <div class="card">
+            <div class="section-header">
+                <h2>🏪 Payees bez kategorii</h2>
+                <button class="btn btn-secondary" onclick="loadPayees()">🔄 Odśwież</button>
+            </div>
+            <p style="color: #888; margin-bottom: 15px;">
+                Te payees zostały znalezione w importowanych CSV ale nie mają przypisanej kategorii. 
+                Utwórz mapowanie aby przyszłe transakcje były automatycznie kategoryzowane.
+            </p>
+            <div id="unmappedPayeesList" class="payee-grid">
+                <div class="empty-state">Brak payees bez kategorii</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="section-header">
+                <h2>✅ Payees z kategorią</h2>
+            </div>
+            <div id="mappedPayeesList" class="payee-grid">
+                <div class="empty-state">Brak zmapowanych payees</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Mappings Tab -->
     <div id="mappingsTab" class="tab-content hidden">
         <div class="card">
-            <h3>🔗 Mapowania kategorii</h3>
+            <h2>🔗 Mapowania kategorii</h2>
             <p style="color: #888; margin-bottom: 15px;">
-                Utwórz powiązania między słowami kluczowymi w transakcjach a kategoriami YNAB.
-                <br>Przykład: "lidl" → "🛒 Groceries"
+                Mapowania automatycznie przypisują kategorie YNAB do transakcji na podstawie nazwy payee.
+                <br>Przykład: keyword "lidl" → kategoria "🛒 Groceries"
             </p>
             
-            <div id="mappingsList"></div>
+            <div id="mappingsList" class="mapping-list">
+                <div class="empty-state">Brak mapowań</div>
+            </div>
             
             <div class="add-mapping">
-                <input type="text" id="newKeyword" placeholder="Słowo kluczowe (np. lidl, allegro)">
+                <input type="text" id="newKeyword" placeholder="Słowo kluczowe (np. lidl)">
                 <select id="newMappingCategory">
                     <option value="">Wybierz kategorię YNAB...</option>
                 </select>
-                <button class="btn" onclick="addMapping()">Dodaj</button>
+                <button class="btn" onclick="addMapping()">Dodaj mapowanie</button>
             </div>
         </div>
     </div>
@@ -363,10 +492,9 @@
         let currentBudgetId = '';
         let ynabCategories = [];
         let ynabAccounts = [];
-        let categoryMappings = {};
         let allTransactions = [];
-        let filteredTransactions = [];
-
+        let unmappedPayees = [];
+        
         // === Initialization ===
         document.addEventListener('DOMContentLoaded', () => {
             init();
@@ -376,6 +504,7 @@
             await checkConnection();
             await loadBudgets();
             await loadMappings();
+            await loadPayees();
         }
 
         // === API Functions ===
@@ -388,6 +517,16 @@
         async function apiPost(endpoint, data) {
             const response = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+
+        async function apiPut(endpoint, data) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
@@ -408,15 +547,15 @@
                 const statusEl = document.getElementById('connectionStatus');
                 const apiStatusEl = document.getElementById('apiStatus');
                 
-                if (data.ynabConfigured) {
+                if (data.database === 'connected' && data.ynabConfigured) {
                     statusEl.className = 'connection-status connected';
-                    statusEl.textContent = '🟢 YNAB Połączony';
-                    apiStatusEl.textContent = '✅ Połączony';
+                    statusEl.textContent = '🟢 Połączony';
+                    apiStatusEl.textContent = '✅ Połączony (DB + YNAB)';
                     apiStatusEl.style.color = '#2ecc71';
                 } else {
                     statusEl.className = 'connection-status disconnected';
-                    statusEl.textContent = '🔴 YNAB Nie skonfigurowany';
-                    apiStatusEl.textContent = '❌ Brak klucza API';
+                    statusEl.textContent = '🔴 Błąd połączenia';
+                    apiStatusEl.textContent = '❌ Problem z połączeniem';
                     apiStatusEl.style.color = '#e74c3c';
                 }
             } catch (err) {
@@ -463,7 +602,6 @@
                     });
                 });
                 
-                // Update all category selects
                 updateCategorySelects();
             } catch (err) {
                 console.error('Failed to load categories:', err);
@@ -491,108 +629,29 @@
         }
 
         function updateCategorySelects() {
+            // Update all category selects
+            document.querySelectorAll('.category-select').forEach(select => {
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">-- Wybierz --</option>';
+                ynabCategories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    if (cat.id === currentValue) option.selected = true;
+                    select.appendChild(option);
+                });
+            });
+            
             // Update mapping category select
             const mappingSelect = document.getElementById('newMappingCategory');
-            mappingSelect.innerHTML = '<option value="">Wybierz kategorię YNAB...</option>';
-            ynabCategories.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat.id;
-                option.textContent = cat.name;
-                mappingSelect.appendChild(option);
-            });
-            
-            // Update filter select
-            const filterSelect = document.getElementById('categoryFilter');
-            filterSelect.innerHTML = '<option value="all">Wszystkie kategorie</option>';
-            ynabCategories.forEach(cat => {
-                const option = document.createElement('option');
-                option.value = cat.id;
-                option.textContent = cat.name;
-                filterSelect.appendChild(option);
-            });
-        }
-
-        // === Mappings ===
-        async function loadMappings() {
-            try {
-                categoryMappings = await apiGet('/mappings');
-                renderMappings();
-            } catch (err) {
-                console.error('Failed to load mappings:', err);
-                categoryMappings = {};
-            }
-        }
-
-        function renderMappings() {
-            const container = document.getElementById('mappingsList');
-            container.innerHTML = '';
-            
-            const entries = Object.entries(categoryMappings);
-            if (entries.length === 0) {
-                container.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">Brak mapowań. Dodaj pierwsze powiązanie poniżej.</p>';
-                return;
-            }
-            
-            entries.forEach(([keyword, mapping]) => {
-                const item = document.createElement('div');
-                item.className = 'mapping-item';
-                item.innerHTML = `
-                    <span class="mapping-keyword">${keyword}</span>
-                    <span class="mapping-arrow">→</span>
-                    <span class="mapping-category">${mapping.ynabCategoryName}</span>
-                    <button class="mapping-delete" onclick="deleteMapping('${keyword}')">Usuń</button>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        async function addMapping() {
-            const keyword = document.getElementById('newKeyword').value.trim().toLowerCase();
-            const categoryId = document.getElementById('newMappingCategory').value;
-            
-            if (!keyword || !categoryId) {
-                alert('Wprowadź słowo kluczowe i wybierz kategorię');
-                return;
-            }
-            
-            const category = ynabCategories.find(c => c.id === categoryId);
-            
-            try {
-                await apiPost('/mappings', {
-                    importKeyword: keyword,
-                    ynabCategoryId: categoryId,
-                    ynabCategoryName: category.name
+            if (mappingSelect) {
+                mappingSelect.innerHTML = '<option value="">Wybierz kategorię YNAB...</option>';
+                ynabCategories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    mappingSelect.appendChild(option);
                 });
-                
-                categoryMappings[keyword] = {
-                    ynabCategoryId: categoryId,
-                    ynabCategoryName: category.name
-                };
-                
-                document.getElementById('newKeyword').value = '';
-                document.getElementById('newMappingCategory').value = '';
-                renderMappings();
-                
-                // Re-apply auto-categorization if transactions loaded
-                if (allTransactions.length > 0) {
-                    applyAutoCategorization();
-                }
-            } catch (err) {
-                alert('Błąd zapisywania mapowania: ' + err.message);
-            }
-        }
-
-        async function deleteMapping(keyword) {
-            try {
-                await apiDelete(`/mappings/${keyword}`);
-                delete categoryMappings[keyword];
-                renderMappings();
-                
-                if (allTransactions.length > 0) {
-                    applyAutoCategorization();
-                }
-            } catch (err) {
-                alert('Błąd usuwania mapowania: ' + err.message);
             }
         }
 
@@ -658,122 +717,227 @@
                 if (isNaN(amount) || isNaN(date.getTime())) continue;
 
                 transactions.push({
-                    date: date,
-                    dateStr: date.toISOString().split('T')[0],
+                    date: date.toISOString().split('T')[0],
+                    operationDate: cols[1]?.trim(),
                     payee: payee,
                     amount: amount,
-                    categoryId: null,
-                    categoryName: null
+                    rawData: { cols }
                 });
             }
             
             return transactions;
         }
 
-        function applyAutoCategorization() {
-            allTransactions.forEach(tx => {
-                const payee = (tx.payee || '').toLowerCase();
-                
-                for (const [keyword, mapping] of Object.entries(categoryMappings)) {
-                    if (payee.includes(keyword.toLowerCase())) {
-                        tx.categoryId = mapping.ynabCategoryId;
-                        tx.categoryName = mapping.ynabCategoryName;
-                        break;
-                    }
-                }
-            });
-            
-            applyFilters();
-        }
-
-        // === File Handling ===
-        function handleFile(event) {
+        // === File Import ===
+        async function handleFile(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = async function(e) {
                 const csvText = e.target.result;
-                allTransactions = parseSantanderCSV(csvText);
+                const transactions = parseSantanderCSV(csvText);
                 
-                // Apply auto-categorization
-                applyAutoCategorization();
-                
-                document.getElementById('resultsArea').classList.remove('hidden');
-                updateStats();
+                // Send to backend for import
+                try {
+                    const result = await apiPost('/import', { transactions });
+                    
+                    document.getElementById('importResults').classList.remove('hidden');
+                    document.getElementById('importedCount').textContent = result.importedTransactions;
+                    document.getElementById('newPayeesCount').textContent = result.importedPayees.length;
+                    document.getElementById('autoCategorizedCount').textContent = result.autoCategorized.length;
+                    
+                    if (result.importedPayees.length > 0) {
+                        document.getElementById('newPayeesAlert').classList.remove('hidden');
+                        document.getElementById('newPayeesNum').textContent = result.importedPayees.length;
+                    }
+                    
+                    // Reload payees
+                    await loadPayees();
+                    
+                    // Load transactions for export
+                    await loadTransactionsForExport();
+                    
+                } catch (err) {
+                    alert('Błąd importu: ' + err.message);
+                }
             };
             reader.readAsText(file, 'UTF-8');
         }
 
-        function updateStats() {
-            const expenses = filteredTransactions.filter(t => t.amount < 0);
-            const total = expenses.reduce((sum, t) => sum + t.amount, 0);
-            const categorized = filteredTransactions.filter(t => t.categoryId).length;
-            
-            document.getElementById('totalCount').textContent = filteredTransactions.length;
-            document.getElementById('totalAmount').textContent = total.toFixed(2) + ' PLN';
-            document.getElementById('categorizedCount').textContent = categorized;
-            
-            document.getElementById('exportBtn').disabled = 
-                !currentBudgetId || 
-                !document.getElementById('accountSelect').value ||
-                filteredTransactions.length === 0;
-        }
-
-        function applyFilters() {
-            const expensesOnly = document.getElementById('expensesOnly').checked;
-            const categoryFilter = document.getElementById('categoryFilter').value;
-            
-            filteredTransactions = allTransactions.filter(t => {
-                if (expensesOnly && t.amount >= 0) return false;
-                if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) return false;
-                return true;
-            });
-            
-            renderTable();
-            updateStats();
-        }
-
-        function renderTable() {
-            const tbody = document.getElementById('transactionsTable');
-            tbody.innerHTML = '';
-            
-            filteredTransactions.forEach((tx, index) => {
-                const row = document.createElement('tr');
+        // === Payees ===
+        async function loadPayees() {
+            try {
+                const data = await apiGet('/payees');
+                unmappedPayees = data.withoutMapping;
                 
-                // Category select
-                const catSelect = document.createElement('select');
-                catSelect.className = 'category-select';
-                catSelect.innerHTML = '<option value="">-- Wybierz --</option>';
-                ynabCategories.forEach(cat => {
-                    const opt = document.createElement('option');
-                    opt.value = cat.id;
-                    opt.textContent = cat.name;
-                    if (cat.id === tx.categoryId) opt.selected = true;
-                    catSelect.appendChild(opt);
+                // Update badge
+                const badge = document.getElementById('unmappedCount');
+                badge.textContent = unmappedPayees.length;
+                badge.classList.toggle('hidden', unmappedPayees.length === 0);
+                
+                // Render unmapped payees
+                const unmappedContainer = document.getElementById('unmappedPayeesList');
+                if (unmappedPayees.length === 0) {
+                    unmappedContainer.innerHTML = '<div class="empty-state">🎉 Wszystkie payees mają przypisane kategorie!</div>';
+                } else {
+                    unmappedContainer.innerHTML = unmappedPayees.map(payee => `
+                        <div class="payee-card unmapped">
+                            <div class="payee-name">${escapeHtml(payee.name)}</div>
+                            <div class="payee-count">${payee.transaction_count} transakcji</div>
+                            <select class="category-select" onchange="assignCategory(${payee.id}, this.value)">
+                                <option value="">Wybierz kategorię...</option>
+                                ${ynabCategories.map(cat => `<option value="${cat.id}">${escapeHtml(cat.name)}</option>`).join('')}
+                            </select>
+                        </div>
+                    `).join('');
+                }
+                
+                // Render mapped payees
+                const mappedContainer = document.getElementById('mappedPayeesList');
+                if (data.withMapping.length === 0) {
+                    mappedContainer.innerHTML = '<div class="empty-state">Brak zmapowanych payees</div>';
+                } else {
+                    mappedContainer.innerHTML = data.withMapping.map(payee => `
+                        <div class="payee-card mapped">
+                            <div class="payee-name">${escapeHtml(payee.name)}</div>
+                            <div class="payee-count">${payee.transaction_count} transakcji</div>
+                            <div class="payee-category">${escapeHtml(payee.ynab_category_name || 'Uncategorized')}</div>
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to load payees:', err);
+            }
+        }
+
+        async function assignCategory(payeeId, categoryId) {
+            if (!categoryId) return;
+            
+            const category = ynabCategories.find(c => c.id === categoryId);
+            
+            try {
+                // Create mapping from payee name
+                const payee = unmappedPayees.find(p => p.id === payeeId);
+                if (!payee) return;
+                
+                // Extract keyword from payee name (simplified)
+                const keyword = payee.normalized_name.split(' ')[0];
+                
+                await apiPost('/mappings', {
+                    keyword: keyword,
+                    ynabCategoryId: categoryId,
+                    ynabCategoryName: category.name
                 });
-                catSelect.onchange = (e) => {
-                    const cat = ynabCategories.find(c => c.id === e.target.value);
-                    tx.categoryId = e.target.value || null;
-                    tx.categoryName = cat ? cat.name : null;
-                    updateStats();
-                };
                 
-                row.innerHTML = `
-                    <td>${tx.dateStr}</td>
-                    <td>${tx.payee}</td>
-                    <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${tx.amount.toFixed(2)}</td>
-                `;
+                // Reload payees
+                await loadPayees();
                 
-                const catCell = document.createElement('td');
-                catCell.appendChild(catSelect);
-                row.appendChild(catCell);
-                
-                tbody.appendChild(row);
-            });
+            } catch (err) {
+                alert('Błąd przypisywania kategorii: ' + err.message);
+            }
         }
 
-        // === Export ===
+        // === Mappings ===
+        let mappings = [];
+
+        async function loadMappings() {
+            try {
+                const data = await apiGet('/mappings');
+                mappings = data.mappings;
+                renderMappings();
+            } catch (err) {
+                console.error('Failed to load mappings:', err);
+            }
+        }
+
+        function renderMappings() {
+            const container = document.getElementById('mappingsList');
+            if (mappings.length === 0) {
+                container.innerHTML = '<div class="empty-state">Brak mapowań. Dodaj pierwsze powiązanie poniżej.</div>';
+                return;
+            }
+            
+            container.innerHTML = mappings.map(m => `
+                <div class="mapping-item">
+                    <span class="mapping-keyword">${escapeHtml(m.keyword)}</span>
+                    <span class="mapping-arrow">→</span>
+                    <span class="mapping-category">${escapeHtml(m.ynab_category_name)}</span>
+                    <span class="mapping-count">${m.payee_count || 0} payees</span>
+                    <button class="mapping-delete" onclick="deleteMapping(${m.id})">Usuń</button>
+                </div>
+            `).join('');
+        }
+
+        async function addMapping() {
+            const keyword = document.getElementById('newKeyword').value.trim().toLowerCase();
+            const categoryId = document.getElementById('newMappingCategory').value;
+            
+            if (!keyword || !categoryId) {
+                alert('Wprowadź słowo kluczowe i wybierz kategorię');
+                return;
+            }
+            
+            const category = ynabCategories.find(c => c.id === categoryId);
+            
+            try {
+                await apiPost('/mappings', {
+                    keyword: keyword,
+                    ynabCategoryId: categoryId,
+                    ynabCategoryName: category.name
+                });
+                
+                document.getElementById('newKeyword').value = '';
+                document.getElementById('newMappingCategory').value = '';
+                
+                await loadMappings();
+                await loadPayees();
+                
+            } catch (err) {
+                alert('Błąd zapisywania mapowania: ' + err.message);
+            }
+        }
+
+        async function deleteMapping(id) {
+            if (!confirm('Czy na pewno chcesz usunąć to mapowanie?')) return;
+            
+            try {
+                await apiDelete(`/mappings/${id}`);
+                await loadMappings();
+                await loadPayees();
+            } catch (err) {
+                alert('Błąd usuwania mapowania: ' + err.message);
+            }
+        }
+
+        // === Transactions Export ===
+        async function loadTransactionsForExport() {
+            try {
+                const data = await apiGet('/transactions/export');
+                allTransactions = data.transactions;
+                
+                document.getElementById('transactionsArea').classList.remove('hidden');
+                renderTransactionsTable();
+                
+                const accountId = document.getElementById('accountSelect').value;
+                document.getElementById('exportBtn').disabled = !accountId || allTransactions.length === 0;
+            } catch (err) {
+                console.error('Failed to load transactions:', err);
+            }
+        }
+
+        function renderTransactionsTable() {
+            const tbody = document.getElementById('transactionsTable');
+            tbody.innerHTML = allTransactions.map(tx => `
+                <tr>
+                    <td>${tx.date}</td>
+                    <td>${escapeHtml(tx.payee)}</td>
+                    <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${parseFloat(tx.amount).toFixed(2)}</td>
+                    <td>${escapeHtml(tx.category_name)}</td>
+                </tr>
+            `).join('');
+        }
+
         async function exportToYNAB() {
             const accountId = document.getElementById('accountSelect').value;
             if (!accountId) {
@@ -786,12 +950,12 @@
             exportBtn.textContent = '⏳ Eksportowanie...';
             
             try {
-                const ynabTransactions = filteredTransactions.map(tx => ({
+                const ynabTransactions = allTransactions.map(tx => ({
                     account_id: accountId,
-                    date: tx.dateStr,
+                    date: tx.date,
                     payee_name: tx.payee,
-                    amount: Math.round(tx.amount * 1000), // YNAB uses milli-units
-                    category_id: tx.categoryId || undefined,
+                    amount: Math.round(tx.amount * 1000),
+                    category_id: tx.category_id || undefined,
                     memo: 'Imported from Santander'
                 }));
                 
@@ -803,6 +967,11 @@
                 const duplicated = result.data.duplicated_import_ids?.length || 0;
                 
                 alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}`);
+                
+                // Clear transactions
+                allTransactions = [];
+                document.getElementById('transactionsArea').classList.add('hidden');
+                
             } catch (err) {
                 alert('❌ Błąd eksportu: ' + (err.message || 'Unknown error'));
             } finally {
@@ -816,14 +985,26 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             
-            event.target.classList.add('active');
-            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            document.getElementById(`${tabName}Tab`).classList.remove('hidden');
+            
+            if (tabName === 'payees') {
+                loadPayees();
+            } else if (tabName === 'mappings') {
+                loadMappings();
+            }
         }
 
         function testConnection() {
-            const url = document.getElementById('backendUrl').value;
-            // In real app, this would update the API_BASE
-            alert('URL zaktualizowany. Odśwież stronę, aby zastosować zmiany.');
+            checkConnection();
+        }
+
+        // === Utilities ===
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }
     </script>
 </body>
