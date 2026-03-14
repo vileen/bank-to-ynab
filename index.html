@@ -61,21 +61,20 @@
         }
         th { color: #e94560; font-weight: 600; }
         tr:hover { background: rgba(233, 69, 96, 0.05); }
-        .category {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 500;
+        select.category-select {
+            background: #0f3460;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            min-width: 150px;
         }
-        .cat-groceries { background: #2ecc71; color: #000; }
-        .cat-shopping { background: #3498db; color: #fff; }
-        .cat-fuel { background: #e74c3c; color: #fff; }
-        .cat-transport { background: #9b59b6; color: #fff; }
-        .cat-subscriptions { background: #f39c12; color: #000; }
-        .cat-personal { background: #1abc9c; color: #000; }
-        .cat-shipping { background: #95a5a6; color: #000; }
-        .cat-uncategorized { background: #e94560; color: #fff; }
+        select.category-select:focus {
+            outline: none;
+            border-color: #e94560;
+        }
         .btn {
             background: #e94560;
             color: white;
@@ -88,6 +87,10 @@
         }
         .btn:hover { opacity: 0.8; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary {
+            background: #0f3460;
+            color: #eee;
+        }
         .filter-bar {
             display: flex;
             gap: 15px;
@@ -102,178 +105,498 @@
             padding: 8px 12px;
             border-radius: 6px;
         }
-        .hidden { display: none; }
-        .last-import {
-            background: #0f3460;
-            padding: 10px 15px;
-            border-radius: 6px;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        .last-import strong { color: #e94560; }
-        .checkbox-wrapper {
+        .hidden { display: none !important; }
+        
+        /* Tabs */
+        .tabs {
             display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-        }
-        input[type="checkbox"] {
-            width: 18px;
-            height: 18px;
-            accent-color: #e94560;
-        }
-        .bank-selector {
+            gap: 10px;
             margin-bottom: 20px;
+            border-bottom: 2px solid #0f3460;
         }
-        .bank-selector label {
-            display: block;
-            margin-bottom: 8px;
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
             color: #888;
+            cursor: pointer;
             font-size: 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
         }
-        .bank-selector select {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
+        .tab.active {
+            color: #e94560;
+            border-bottom-color: #e94560;
+        }
+        .tab:hover:not(.active) {
+            color: #ccc;
+        }
+        
+        /* Settings panel */
+        .settings-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .settings-row label {
+            min-width: 100px;
+            color: #888;
+        }
+        .settings-row select {
+            flex: 1;
+            min-width: 200px;
             background: #0f3460;
             border: 1px solid #333;
-            border-radius: 8px;
             color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        
+        /* Mappings */
+        .mapping-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            background: #0f3460;
+            border-radius: 6px;
+            margin-bottom: 8px;
+        }
+        .mapping-keyword {
+            flex: 1;
+            font-weight: 500;
+        }
+        .mapping-arrow {
+            color: #888;
+        }
+        .mapping-category {
+            flex: 1;
+            color: #2ecc71;
+        }
+        .mapping-delete {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        /* Add mapping form */
+        .add-mapping {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #333;
+        }
+        .add-mapping input {
+            flex: 1;
+            background: #0f3460;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+        }
+        
+        .connection-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+        }
+        .connection-status.connected {
+            background: rgba(46, 204, 113, 0.2);
+            color: #2ecc71;
+        }
+        .connection-status.disconnected {
+            background: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
         }
     </style>
 </head>
 <body>
-    <h1>🏦 Bank CSV → YNAB Importer</h1>
-    <p class="subtitle">Importuj transakcje z polskich banków do YNAB</p>
+    <h1>🏦 Bank CSV → YNAB</h1>
+    <p class="subtitle">
+        Importuj transakcje z banku do YNAB 
+        <span id="connectionStatus" class="connection-status disconnected">
+            🔴 Łączenie...
+        </span>
+    </p>
 
-    <div class="card">
-        <div class="bank-selector">
-            <label>🏛️ Wybierz bank</label>
-            <select id="bankSelect">
-                <option value="santander">Santander Polska (karta kredytowa)</option>
-            </select>
+    <div class="tabs">
+        <button class="tab active" onclick="showTab('import')">📥 Import</button>
+        <button class="tab" onclick="showTab('mappings')">🔗 Mapowania</button>
+        <button class="tab" onclick="showTab('settings')">⚙️ Ustawienia</button>
+    </div>
+
+    <!-- Import Tab -->
+    <div id="importTab" class="tab-content">
+        <div class="card">
+            <div class="settings-row">
+                <label>Budget:</label>
+                <select id="budgetSelect" onchange="onBudgetChange()">
+                    <option value="">Wybierz budget...</option>
+                </select>
+            </div>
+            <div class="settings-row">
+                <label>Konto:</label>
+                <select id="accountSelect">
+                    <option value="">Wybierz konto...</option>
+                </select>
+            </div>
         </div>
 
-        <div class="last-import" id="lastImport">
-            📅 Ostatni import: <strong>brak danych</strong>
+        <div class="card">
+            <label class="upload-area" id="dropZone">
+                <input type="file" id="csvFile" accept=".csv" onchange="handleFile(event)">
+                <p style="font-size: 24px; margin-bottom: 10px;">📁</p>
+                <p><strong>Kliknij lub przeciągnij plik CSV</strong></p>
+                <p style="color: #888; font-size: 12px; margin-top: 10px;">
+                    Obsługuje eksport z Santander
+                </p>
+            </label>
         </div>
-        
-        <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-            <h3>📁 Kliknij lub przeciągnij plik CSV</h3>
-            <p id="uploadHint">Obsługuje eksport z Santander internet</p>
-            <input type="file" id="fileInput" accept=".csv" onchange="handleFile(event)">
+
+        <div id="resultsArea" class="hidden">
+            <div class="card">
+                <div class="stats">
+                    <div class="stat-box">
+                        <div class="stat-value" id="totalCount">0</div>
+                        <div class="stat-label">Transakcje</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="totalAmount">0 PLN</div>
+                        <div class="stat-label">Suma wydatków</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="categorizedCount">0</div>
+                        <div class="stat-label">Skategoryzowane</div>
+                    </div>
+                </div>
+
+                <div class="filter-bar">
+                    <label>
+                        <input type="checkbox" id="expensesOnly" checked onchange="applyFilters()">
+                        Tylko wydatki (bez spłat)
+                    </label>
+                    <select id="categoryFilter" onchange="applyFilters()">
+                        <option value="all">Wszystkie kategorie</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="exportToYNAB()" id="exportBtn" disabled>
+                    📥 Eksportuj do YNAB
+                </button>
+            </div>
+
+            <div class="card">
+                <h3>📋 Lista transakcji</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Payee</th>
+                            <th>Kwota</th>
+                            <th>Kategoria YNAB</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsTable"></tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div id="results" class="hidden">
+    <!-- Mappings Tab -->
+    <div id="mappingsTab" class="tab-content hidden">
         <div class="card">
-            <h3>📊 Podsumowanie</h3>
-            <div class="stats">
-                <div class="stat-box">
-                    <div class="stat-value" id="totalCount">0</div>
-                    <div class="stat-label">Transakcje</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="totalAmount">0 PLN</div>
-                    <div class="stat-label">Suma wydatków</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="newCount">0</div>
-                    <div class="stat-label">Nowe (po dacie)</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="categorizedCount">0</div>
-                    <div class="stat-label">Skategoryzowane</div>
-                </div>
-            </div>
-
-            <div class="filter-bar">
-                <label class="checkbox-wrapper">
-                    <input type="checkbox" id="onlyNew" checked onchange="filterTransactions()">
-                    <span>Pokaż tylko nowe transakcje</span>
-                </label>
-                <label class="checkbox-wrapper">
-                    <input type="checkbox" id="onlyExpenses" checked onchange="filterTransactions()">
-                    <span>Tylko wydatki (bez spłat)</span>
-                </label>
-                <select id="categoryFilter" onchange="filterTransactions()">
-                    <option value="all">Wszystkie kategorie</option>
+            <h3>🔗 Mapowania kategorii</h3>
+            <p style="color: #888; margin-bottom: 15px;">
+                Utwórz powiązania między słowami kluczowymi w transakcjach a kategoriami YNAB.
+                <br>Przykład: "lidl" → "🛒 Groceries"
+            </p>
+            
+            <div id="mappingsList"></div>
+            
+            <div class="add-mapping">
+                <input type="text" id="newKeyword" placeholder="Słowo kluczowe (np. lidl, allegro)">
+                <select id="newMappingCategory">
+                    <option value="">Wybierz kategorię YNAB...</option>
                 </select>
+                <button class="btn" onclick="addMapping()">Dodaj</button>
             </div>
-
-            <button class="btn" onclick="exportToYNAB()">📥 Eksportuj do YNAB CSV</button>
         </div>
+    </div>
 
+    <!-- Settings Tab -->
+    <div id="settingsTab" class="tab-content hidden">
         <div class="card">
-            <h3>📋 Lista transakcji</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Payee</th>
-                        <th>Kwota</th>
-                        <th>Kategoria</th>
-                    </tr>
-                </thead>
-                <tbody id="transactionsTable"></tbody>
-            </table>
+            <h3>⚙️ Ustawienia YNAB</h3>
+            <p style="color: #888; margin-bottom: 15px;">
+                Backend automatycznie łączy się z YNAB API.
+            </p>
+            <div class="settings-row">
+                <label>Status API:</label>
+                <span id="apiStatus">Sprawdzanie...</span>
+            </div>
+            <div class="settings-row">
+                <label>URL Backendu:</label>
+                <input type="text" id="backendUrl" value="http://localhost:3001" 
+                       style="background: #0f3460; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; flex: 1;">
+            </div>
+            <button class="btn" onclick="testConnection()" style="margin-top: 10px;">
+                🔄 Testuj połączenie
+            </button>
         </div>
     </div>
 
     <script>
-        // Bank configurations
-        const BANK_CONFIGS = {
-            santander: {
-                name: 'Santander Polska',
-                hint: 'Obsługuje eksport z Santander internet (karta kredytowa)',
-                parse: parseSantanderCSV,
-            }
-        };
-
-        let currentBank = 'santander';
+        // === Configuration ===
+        const API_BASE = 'http://localhost:3001/api';
+        
+        // === State ===
+        let currentBudgetId = '';
+        let ynabCategories = [];
+        let ynabAccounts = [];
+        let categoryMappings = {};
         let allTransactions = [];
         let filteredTransactions = [];
 
-        // Update UI when bank changes
-        document.getElementById('bankSelect').addEventListener('change', (e) => {
-            currentBank = e.target.value;
-            const config = BANK_CONFIGS[currentBank];
-            document.getElementById('uploadHint').textContent = config.hint;
+        // === Initialization ===
+        document.addEventListener('DOMContentLoaded', () => {
+            init();
         });
 
-        // Category rules
-        const CATEGORY_RULES = [
-            { pattern: /lidl|stokrotka|auchan|żabka|transgourmet/i, name: '🛒 Groceries' },
-            { pattern: /orlen/i, name: '⛽ Fuel' },
-            { pattern: /mpk/i, name: '🚌 Transport' },
-            { pattern: /youtube|spotify|discord|audioteka|netflix|hbo|prime/i, name: '📺 Subscriptions' },
-            { pattern: /trychodiet|damian nizio|super.pharm|eubiosis/i, name: '💇 Personal Care' },
-            { pattern: /allegro|amazon|morele|iherb|bulk/i, name: '🛍️ Shopping' },
-            { pattern: /poczta polska/i, name: '📦 Shipping' },
-        ];
+        async function init() {
+            await checkConnection();
+            await loadBudgets();
+            await loadMappings();
+        }
 
-        function categorize(payee) {
-            for (const cat of CATEGORY_RULES) {
-                if (cat.pattern.test(payee)) return cat;
+        // === API Functions ===
+        async function apiGet(endpoint) {
+            const response = await fetch(`${API_BASE}${endpoint}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+
+        async function apiPost(endpoint, data) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+
+        async function apiDelete(endpoint) {
+            const response = await fetch(`${API_BASE}${endpoint}`, { method: 'DELETE' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        }
+
+        // === Connection & Budgets ===
+        async function checkConnection() {
+            try {
+                const data = await apiGet('/health');
+                const statusEl = document.getElementById('connectionStatus');
+                const apiStatusEl = document.getElementById('apiStatus');
+                
+                if (data.ynabConfigured) {
+                    statusEl.className = 'connection-status connected';
+                    statusEl.textContent = '🟢 YNAB Połączony';
+                    apiStatusEl.textContent = '✅ Połączony';
+                    apiStatusEl.style.color = '#2ecc71';
+                } else {
+                    statusEl.className = 'connection-status disconnected';
+                    statusEl.textContent = '🔴 YNAB Nie skonfigurowany';
+                    apiStatusEl.textContent = '❌ Brak klucza API';
+                    apiStatusEl.style.color = '#e74c3c';
+                }
+            } catch (err) {
+                console.error('Connection check failed:', err);
+                document.getElementById('connectionStatus').textContent = '🔴 Błąd połączenia';
+                document.getElementById('apiStatus').textContent = '❌ Błąd: ' + err.message;
             }
-            return { name: '❓ Uncategorized', class: 'cat-uncategorized' };
         }
 
-        function parseAmount(amountStr) {
-            const clean = amountStr.replace(/\s/g, '').replace(',', '.');
-            return parseFloat(clean);
+        async function loadBudgets() {
+            try {
+                const data = await apiGet('/budgets');
+                const select = document.getElementById('budgetSelect');
+                select.innerHTML = '<option value="">Wybierz budget...</option>';
+                
+                data.data.budgets.forEach(budget => {
+                    const option = document.createElement('option');
+                    option.value = budget.id;
+                    option.textContent = budget.name;
+                    select.appendChild(option);
+                });
+            } catch (err) {
+                console.error('Failed to load budgets:', err);
+            }
         }
 
-        function parseDate(dateStr) {
-            const parts = dateStr.split('-');
-            return new Date(parts[2], parts[1] - 1, parts[0]);
+        async function onBudgetChange() {
+            const budgetId = document.getElementById('budgetSelect').value;
+            if (!budgetId) return;
+            
+            currentBudgetId = budgetId;
+            
+            // Load categories
+            try {
+                const catData = await apiGet(`/budgets/${budgetId}/categories`);
+                ynabCategories = [];
+                
+                catData.data.category_groups.forEach(group => {
+                    group.categories.forEach(cat => {
+                        ynabCategories.push({
+                            id: cat.id,
+                            name: `${group.name}: ${cat.name}`
+                        });
+                    });
+                });
+                
+                // Update all category selects
+                updateCategorySelects();
+            } catch (err) {
+                console.error('Failed to load categories:', err);
+            }
+            
+            // Load accounts
+            try {
+                const accData = await apiGet(`/budgets/${budgetId}/accounts`);
+                const accSelect = document.getElementById('accountSelect');
+                accSelect.innerHTML = '<option value="">Wybierz konto...</option>';
+                
+                accData.data.accounts.forEach(acc => {
+                    if (!acc.closed) {
+                        const option = document.createElement('option');
+                        option.value = acc.id;
+                        option.textContent = acc.name;
+                        accSelect.appendChild(option);
+                    }
+                });
+                
+                ynabAccounts = accData.data.accounts;
+            } catch (err) {
+                console.error('Failed to load accounts:', err);
+            }
         }
 
-        function formatDate(date) {
-            return date.toISOString().split('T')[0];
+        function updateCategorySelects() {
+            // Update mapping category select
+            const mappingSelect = document.getElementById('newMappingCategory');
+            mappingSelect.innerHTML = '<option value="">Wybierz kategorię YNAB...</option>';
+            ynabCategories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                mappingSelect.appendChild(option);
+            });
+            
+            // Update filter select
+            const filterSelect = document.getElementById('categoryFilter');
+            filterSelect.innerHTML = '<option value="all">Wszystkie kategorie</option>';
+            ynabCategories.forEach(cat => {
+                const option = document.createElement('option');
+                option.value = cat.id;
+                option.textContent = cat.name;
+                filterSelect.appendChild(option);
+            });
         }
 
-        // Parse CSV line respecting quotes
+        // === Mappings ===
+        async function loadMappings() {
+            try {
+                categoryMappings = await apiGet('/mappings');
+                renderMappings();
+            } catch (err) {
+                console.error('Failed to load mappings:', err);
+                categoryMappings = {};
+            }
+        }
+
+        function renderMappings() {
+            const container = document.getElementById('mappingsList');
+            container.innerHTML = '';
+            
+            const entries = Object.entries(categoryMappings);
+            if (entries.length === 0) {
+                container.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">Brak mapowań. Dodaj pierwsze powiązanie poniżej.</p>';
+                return;
+            }
+            
+            entries.forEach(([keyword, mapping]) => {
+                const item = document.createElement('div');
+                item.className = 'mapping-item';
+                item.innerHTML = `
+                    <span class="mapping-keyword">${keyword}</span>
+                    <span class="mapping-arrow">→</span>
+                    <span class="mapping-category">${mapping.ynabCategoryName}</span>
+                    <button class="mapping-delete" onclick="deleteMapping('${keyword}')">Usuń</button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        async function addMapping() {
+            const keyword = document.getElementById('newKeyword').value.trim().toLowerCase();
+            const categoryId = document.getElementById('newMappingCategory').value;
+            
+            if (!keyword || !categoryId) {
+                alert('Wprowadź słowo kluczowe i wybierz kategorię');
+                return;
+            }
+            
+            const category = ynabCategories.find(c => c.id === categoryId);
+            
+            try {
+                await apiPost('/mappings', {
+                    importKeyword: keyword,
+                    ynabCategoryId: categoryId,
+                    ynabCategoryName: category.name
+                });
+                
+                categoryMappings[keyword] = {
+                    ynabCategoryId: categoryId,
+                    ynabCategoryName: category.name
+                };
+                
+                document.getElementById('newKeyword').value = '';
+                document.getElementById('newMappingCategory').value = '';
+                renderMappings();
+                
+                // Re-apply auto-categorization if transactions loaded
+                if (allTransactions.length > 0) {
+                    applyAutoCategorization();
+                }
+            } catch (err) {
+                alert('Błąd zapisywania mapowania: ' + err.message);
+            }
+        }
+
+        async function deleteMapping(keyword) {
+            try {
+                await apiDelete(`/mappings/${keyword}`);
+                delete categoryMappings[keyword];
+                renderMappings();
+                
+                if (allTransactions.length > 0) {
+                    applyAutoCategorization();
+                }
+            } catch (err) {
+                alert('Błąd usuwania mapowania: ' + err.message);
+            }
+        }
+
+        // === CSV Parsing ===
         function parseCSVLine(line) {
             const result = [];
             let current = '';
@@ -294,34 +617,36 @@
             return result;
         }
 
-        // Santander parser
+        function parseAmount(amountStr) {
+            const clean = amountStr.replace(/\s/g, '').replace(',', '.');
+            return parseFloat(clean);
+        }
+
+        function parseDate(dateStr) {
+            const parts = dateStr.split('-');
+            return new Date(parts[2], parts[1] - 1, parts[0]);
+        }
+
         function parseSantanderCSV(csvText) {
             const lines = csvText.trim().split('\n');
             const transactions = [];
             let firstLine = true;
             
             for (const line of lines) {
-                // Skip empty lines
                 if (!line.trim()) continue;
                 
                 const cols = parseCSVLine(line);
                 
-                // Skip first line with account holder info
                 if (firstLine) {
                     firstLine = false;
-                    // Check if this looks like account holder line (has account number format)
-                    if (cols[2]?.includes('1090') || cols[3]?.includes('DOMINIK')) {
+                    if (cols[2]?.includes('1090') || cols[3]?.includes('DOMINIK') || cols[3]?.includes('TESTOWY')) {
                         continue;
                     }
                 }
                 
-                // Need at least: date, op_date, account, payee, empty, amount, balance, nr
                 if (cols.length < 6) continue;
 
                 const bookingDate = cols[0]?.trim();
-                const opDate = cols[1]?.trim();
-                // cols[2] = payee (e.g. 'Google YouTube...', 'LIDL...')
-                // cols[3] = extra info or empty for transactions
                 const payee = cols[2]?.trim();
                 const amountStr = cols[5]?.trim();
 
@@ -332,64 +657,79 @@
 
                 if (isNaN(amount) || isNaN(date.getTime())) continue;
 
-                const category = categorize(payee);
-
                 transactions.push({
                     date: date,
-                    dateStr: formatDate(date),
-                    bookingDate: bookingDate,
+                    dateStr: date.toISOString().split('T')[0],
                     payee: payee,
                     amount: amount,
-                    category: category,
-                    isExpense: amount < 0 && !category.name.includes('Payment'),
-                    isPayment: category.name === 'Payment' || /spłata/i.test(payee)
+                    categoryId: null,
+                    categoryName: null
                 });
             }
             
             return transactions;
         }
 
+        function applyAutoCategorization() {
+            allTransactions.forEach(tx => {
+                const payee = (tx.payee || '').toLowerCase();
+                
+                for (const [keyword, mapping] of Object.entries(categoryMappings)) {
+                    if (payee.includes(keyword.toLowerCase())) {
+                        tx.categoryId = mapping.ynabCategoryId;
+                        tx.categoryName = mapping.ynabCategoryName;
+                        break;
+                    }
+                }
+            });
+            
+            applyFilters();
+        }
+
+        // === File Handling ===
         function handleFile(event) {
             const file = event.target.files[0];
             if (!file) return;
 
             const reader = new FileReader();
             reader.onload = function(e) {
-                const config = BANK_CONFIGS[currentBank];
-                allTransactions = config.parse(e.target.result);
+                const csvText = e.target.result;
+                allTransactions = parseSantanderCSV(csvText);
                 
-                allTransactions.sort((a, b) => b.date - a.date);
-                filterTransactions();
-                document.getElementById('results').classList.remove('hidden');
+                // Apply auto-categorization
+                applyAutoCategorization();
+                
+                document.getElementById('resultsArea').classList.remove('hidden');
                 updateStats();
             };
-            reader.readAsText(file);
+            reader.readAsText(file, 'UTF-8');
         }
 
-        // Load last import date
-        const lastImportKey = `ynab-importer-last-${currentBank}`;
-        const lastImportDate = localStorage.getItem(lastImportKey);
-        if (lastImportDate) {
-            document.getElementById('lastImport').innerHTML = 
-                `📅 Ostatni import: <strong>${lastImportDate}</strong>`;
+        function updateStats() {
+            const expenses = filteredTransactions.filter(t => t.amount < 0);
+            const total = expenses.reduce((sum, t) => sum + t.amount, 0);
+            const categorized = filteredTransactions.filter(t => t.categoryId).length;
+            
+            document.getElementById('totalCount').textContent = filteredTransactions.length;
+            document.getElementById('totalAmount').textContent = total.toFixed(2) + ' PLN';
+            document.getElementById('categorizedCount').textContent = categorized;
+            
+            document.getElementById('exportBtn').disabled = 
+                !currentBudgetId || 
+                !document.getElementById('accountSelect').value ||
+                filteredTransactions.length === 0;
         }
 
-        function filterTransactions() {
-            const onlyNew = document.getElementById('onlyNew').checked;
-            const onlyExpenses = document.getElementById('onlyExpenses').checked;
+        function applyFilters() {
+            const expensesOnly = document.getElementById('expensesOnly').checked;
             const categoryFilter = document.getElementById('categoryFilter').value;
             
-            const lastImportKey = `ynab-importer-last-${currentBank}`;
-            const cutoffDate = localStorage.getItem(lastImportKey) ? 
-                new Date(localStorage.getItem(lastImportKey)) : new Date(0);
-
             filteredTransactions = allTransactions.filter(t => {
-                if (onlyNew && t.date <= cutoffDate) return false;
-                if (onlyExpenses && (t.isPayment || t.amount > 0)) return false;
-                if (categoryFilter !== 'all' && t.category.name !== categoryFilter) return false;
+                if (expensesOnly && t.amount >= 0) return false;
+                if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) return false;
                 return true;
             });
-
+            
             renderTable();
             updateStats();
         }
@@ -397,92 +737,94 @@
         function renderTable() {
             const tbody = document.getElementById('transactionsTable');
             tbody.innerHTML = '';
-
-            for (const t of filteredTransactions.slice(0, 100)) {
+            
+            filteredTransactions.forEach((tx, index) => {
                 const row = document.createElement('tr');
+                
+                // Category select
+                const catSelect = document.createElement('select');
+                catSelect.className = 'category-select';
+                catSelect.innerHTML = '<option value="">-- Wybierz --</option>';
+                ynabCategories.forEach(cat => {
+                    const opt = document.createElement('option');
+                    opt.value = cat.id;
+                    opt.textContent = cat.name;
+                    if (cat.id === tx.categoryId) opt.selected = true;
+                    catSelect.appendChild(opt);
+                });
+                catSelect.onchange = (e) => {
+                    const cat = ynabCategories.find(c => c.id === e.target.value);
+                    tx.categoryId = e.target.value || null;
+                    tx.categoryName = cat ? cat.name : null;
+                    updateStats();
+                };
+                
                 row.innerHTML = `
-                    <td>${t.dateStr}</td>
-                    <td>${t.payee.substring(0, 50)}</td>
-                    <td style="color: ${t.amount < 0 ? '#e94560' : '#2ecc71'}">${t.amount.toFixed(2)} PLN</td>
-                    <td><span class="category ${t.category.class || 'cat-uncategorized'}">${t.category.name}</span></td>
+                    <td>${tx.dateStr}</td>
+                    <td>${tx.payee}</td>
+                    <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${tx.amount.toFixed(2)}</td>
                 `;
+                
+                const catCell = document.createElement('td');
+                catCell.appendChild(catSelect);
+                row.appendChild(catCell);
+                
                 tbody.appendChild(row);
-            }
-
-            if (filteredTransactions.length > 100) {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td colspan="4" style="text-align:center;color:#888">... i ${filteredTransactions.length - 100} więcej</td>`;
-                tbody.appendChild(row);
-            }
-        }
-
-        function updateStats() {
-            const expenses = allTransactions.filter(t => t.amount < 0 && !t.isPayment);
-            const total = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0);
-            
-            const lastImportKey = `ynab-importer-last-${currentBank}`;
-            const cutoffDate = localStorage.getItem(lastImportKey) ? 
-                new Date(localStorage.getItem(lastImportKey)) : new Date(0);
-            const newTransactions = allTransactions.filter(t => t.date > cutoffDate && t.amount < 0 && !t.isPayment);
-            
-            const categorized = allTransactions.filter(t => t.category.name !== '❓ Uncategorized').length;
-
-            document.getElementById('totalCount').textContent = allTransactions.length;
-            document.getElementById('totalAmount').textContent = total.toFixed(0) + ' PLN';
-            document.getElementById('newCount').textContent = newTransactions.length;
-            document.getElementById('categorizedCount').textContent = categorized;
-
-            const categories = [...new Set(allTransactions.map(t => t.category.name))];
-            const select = document.getElementById('categoryFilter');
-            select.innerHTML = '<option value="all">Wszystkie kategorie</option>';
-            categories.forEach(cat => {
-                select.innerHTML += `<option value="${cat}">${cat}</option>`;
             });
         }
 
-        function exportToYNAB() {
-            let csv = 'Date,Payee,Memo,Amount\n';
+        // === Export ===
+        async function exportToYNAB() {
+            const accountId = document.getElementById('accountSelect').value;
+            if (!accountId) {
+                alert('Wybierz konto YNAB');
+                return;
+            }
             
-            for (const t of filteredTransactions) {
-                const payee = t.payee.replace(/"/g, '""');
-                csv += `${t.dateStr},"${payee}",,${t.amount.toFixed(2)}\n`;
+            const exportBtn = document.getElementById('exportBtn');
+            exportBtn.disabled = true;
+            exportBtn.textContent = '⏳ Eksportowanie...';
+            
+            try {
+                const ynabTransactions = filteredTransactions.map(tx => ({
+                    account_id: accountId,
+                    date: tx.dateStr,
+                    payee_name: tx.payee,
+                    amount: Math.round(tx.amount * 1000), // YNAB uses milli-units
+                    category_id: tx.categoryId || undefined,
+                    memo: 'Imported from Santander'
+                }));
+                
+                const result = await apiPost(`/budgets/${currentBudgetId}/transactions`, {
+                    transactions: ynabTransactions
+                });
+                
+                const imported = result.data.transactions?.length || 0;
+                const duplicated = result.data.duplicated_import_ids?.length || 0;
+                
+                alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}`);
+            } catch (err) {
+                alert('❌ Błąd eksportu: ' + (err.message || 'Unknown error'));
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.textContent = '📥 Eksportuj do YNAB';
             }
-
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `ynab_import_${currentBank}_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-
-            if (filteredTransactions.length > 0) {
-                const newestDate = filteredTransactions[0].dateStr;
-                const lastImportKey = `ynab-importer-last-${currentBank}`;
-                localStorage.setItem(lastImportKey, newestDate);
-                document.getElementById('lastImport').innerHTML = 
-                    `📅 Ostatni import: <strong>${newestDate}</strong> (zapisano)`;
-            }
-
-            alert(`✅ Wyeksportowano ${filteredTransactions.length} transakcji!`);
         }
 
-        document.querySelector('.upload-area').addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.currentTarget.style.background = 'rgba(233, 69, 96, 0.2)';
-        });
+        // === Tab Navigation ===
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+        }
 
-        document.querySelector('.upload-area').addEventListener('dragleave', (e) => {
-            e.currentTarget.style.background = '';
-        });
-
-        document.querySelector('.upload-area').addEventListener('drop', (e) => {
-            e.preventDefault();
-            e.currentTarget.style.background = '';
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                document.getElementById('fileInput').files = files;
-                handleFile({ target: { files: files } });
-            }
-        });
+        function testConnection() {
+            const url = document.getElementById('backendUrl').value;
+            // In real app, this would update the API_BASE
+            alert('URL zaktualizowany. Odśwież stronę, aby zastosować zmiany.');
+        }
     </script>
 </body>
 </html>

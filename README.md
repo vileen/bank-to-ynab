@@ -1,6 +1,73 @@
 # Bank CSV → YNAB Importer
 
-Web UI do importu transakcji z polskich banków do YNAB z auto-kategoryzacją.
+Web UI do importu transakcji z polskich banków do YNAB z auto-kategoryzacją i integracją API.
+
+## Architektura
+
+```
+┌─────────────┐      ┌─────────────────┐      ┌─────────────┐
+│   Frontend  │ ←──→ │    Backend      │ ←──→ │  YNAB API   │
+│  (GitHub    │      │  (Node.js)      │      │             │
+│   Pages)    │      │  (localhost)    │      │             │
+└─────────────┘      └─────────────────┘      └─────────────┘
+```
+
+## Features
+
+### Frontend
+- 🏛️ **Wybór banku** — parsery dla różnych formatów CSV
+- 📁 Upload CSV (drag & drop)
+- 🏷️ Auto-kategorie na podstawie mapowań
+- 📊 Podsumowanie wydatków
+- 🔍 Filtry (tylko wydatki / kategoria)
+- 🔗 **Integracja z YNAB API** — pobieranie kategorii i kont
+- 🔗 **Mapowania kategorii** — twórz własne reguły
+
+### Backend
+- 🔐 **Klucz API w .env** — bezpieczne przechowywanie
+- 📡 **Proxy do YNAB API** — pobieranie budgetów, kategorii, kont
+- 💾 **Storage mapowań** — JSON file storage
+- 🔄 **Auto-kategoryzacja** — na podstawie zapisanych reguł
+
+## Szybki start
+
+### 1. Uruchom backend
+
+```bash
+cd backend
+npm install
+npm start
+```
+
+Backend uruchomi się na `http://localhost:3001`
+
+### 2. Skonfiguruj YNAB API Key
+
+W pliku `backend/.env`:
+```env
+YNAB_API_KEY=twój_personal_access_token
+```
+
+[Jak uzyskać YNAB Personal Access Token](https://api.youneedabudget.com/#personal-access-tokens)
+
+### 3. Uruchom frontend
+
+Frontend to statyczny HTML — możesz otworzyć bezpośrednio:
+```bash
+# Opcja 1: Otwórz plik w przeglądarce
+open index.html
+
+# Opcja 2: Użyj prostego serwera
+npx serve . -p 8080
+```
+
+### 4. Użyj aplikacji
+
+1. Wybierz budget YNAB
+2. Wybierz konto docelowe
+3. Wgraj plik CSV z banku
+4. Kategorie zostaną automatycznie przypisane (jeśli masz mapowania)
+5. Eksportuj transakcje bezpośrednio do YNAB
 
 ## Obsługiwane banki
 
@@ -10,86 +77,69 @@ Web UI do importu transakcji z polskich banków do YNAB z auto-kategoryzacją.
 | 🇵🇱 mBank | 🚧 Planowane | - |
 | 🇵🇱 ING | 🚧 Planowane | - |
 | 🇵🇱 PKO BP | 🚧 Planowane | - |
-| 🇵🇱 Pekao | 🚧 Planowane | - |
 
-## Features
-- 🏛️ **Wybór banku** — każdy bank ma swój parser formatu CSV
-- 📁 Upload CSV (drag & drop)
-- 📅 Pamięta datę ostatniego importu per bank (localStorage)
-- 🏷️ Auto-kategorie (Lidl, Allegro, Spotify, etc.)
-- 🔍 Filtry (tylko nowe / tylko wydatki / kategoria)
-- 📊 Podsumowanie wydatków
-- 📥 Eksport CSV gotowy do YNAB
+## Mapowania kategorii
 
-## Deploy na GitHub Pages
+Przejdź do zakładki **"Mapowania"** aby utworzyć powiązania:
 
-### 1. Stwórz repo na GitHub
+| Słowo kluczowe | Kategoria YNAB |
+|----------------|----------------|
+| lidl | 🛒 Groceries |
+| allegro | 🛍️ Shopping |
+| youtube | 📺 Subscriptions |
+| orlen | ⛽ Fuel |
+| mpk | 🚌 Transport |
+
+Przy imporcie CSV aplikacja automatycznie przypisze kategorie na podstawie tych reguł.
+
+## API Endpoints
+
+### YNAB Proxy
+- `GET /api/budgets` — lista budgetów
+- `GET /api/budgets/:id/categories` — kategorie
+- `GET /api/budgets/:id/accounts` — konta
+- `POST /api/budgets/:id/transactions` — tworzenie transakcji
+
+### Mapowania
+- `GET /api/mappings` — lista mapowań
+- `POST /api/mappings` — dodaj mapowanie
+- `DELETE /api/mappings/:keyword` — usuń mapowanie
+
+### Health
+- `GET /api/health` — status połączenia
+
+## Deploy
+
+### Frontend (GitHub Pages)
 ```bash
-# Utwórz nowe repo "bank-to-ynab" na GitHub.com
-```
-
-### 2. Wypushuj kod
-```bash
-cd ~/santander-to-ynab  # lub przenieś folder
-mv santander-to-ynab bank-to-ynab  # opcjonalnie: zmień nazwę folderu
-git init
 git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/vileen/bank-to-ynab.git
-git push -u origin main
+git commit -m "Update frontend"
+git push origin main
 ```
 
-### 3. Włącz GitHub Pages
-- Wejdź w repo → Settings → Pages
-- Source: Deploy from a branch
-- Branch: main / (root)
-- Save
+GitHub Pages automatycznie zdeployuje zmiany.
 
-### 4. Gotowe!
-Appka będzie dostępna pod:
-`https://vileen.github.io/bank-to-ynab`
-
-## Dodawanie nowego banku
-
-Chcesz dodać wsparcie dla innego banku? Wystarczy dodać parser w `index.html`:
-
-```javascript
-const BANK_CONFIGS = {
-    santander: {
-        name: 'Santander Polska',
-        hint: 'Obsługuje eksport z Santander internet',
-        parse: parseSantanderCSV,
-    },
-    mbank: {
-        name: 'mBank',
-        hint: 'Eksport z mBanku (historia operacji)',
-        parse: parseMbankCSV,
-    }
-};
+### Backend (lokalny VPS / VPS)
+```bash
+# Przykład z PM2
+pm2 start backend/server.js --name bank-to-ynab
 ```
 
-## Usage
-1. Wybierz bank z listy
-2. Wrzuć CSV wyeksportowany z banku
-3. Zobacz podsumowanie i nowe transakcje
-4. Kliknij "Eksportuj do YNAB CSV"
-5. Import w YNAB → gotowe!
-
-## Auto-kategorie
-
-Aplikacja automatycznie przypisuje kategorie na podstawie nazwy payee:
-
-| Pattern | Kategoria |
-|---------|-----------|
-| Lidl, Stokrotka, Auchan, Żabka | 🛒 Groceries |
-| Orlen, BP, Shell | ⛽ Fuel |
-| MPK, Uber, Bolt | 🚌 Transport |
-| YouTube, Spotify, Netflix, HBO | 📺 Subscriptions |
-| Allegro, Amazon, Morele | 🛍️ Shopping |
-| Trychodiet, Super-Pharm | 💇 Personal Care |
+**Ważne:** Nigdy nie commituj `backend/.env` z prawdziwym kluczem API!
 
 ## Technologie
-- Vanilla HTML/JS (bez frameworków)
-- LocalStorage do przechowywania dat ostatnich importów
-- Client-side CSV parsing
+
+- **Frontend:** Vanilla HTML/JS, CSS Grid/Flexbox
+- **Backend:** Node.js, Express, Axios
+- **Storage:** JSON files (można zamienić na SQLite/PostgreSQL)
+
+## Roadmap
+
+- [x] Parser Santander CSV
+- [x] Integracja z YNAB API
+- [x] Mapowania kategorii
+- [x] Auto-kategoryzacja
+- [ ] Wsparcie dla więcej banków (mBank, ING, PKO)
+- [ ] Historia importów
+- [ ] Wykresy statystyk
+- [ ] Import bezpośrednio z banku (PSD2 API)
