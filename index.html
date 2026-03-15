@@ -1317,11 +1317,22 @@
             }
         }
 
+        function formatDate(dateStr) {
+            if (!dateStr) return '';
+            const date = new Date(dateStr);
+            if (isNaN(date.getTime())) return dateStr;
+            return date.toLocaleDateString('pl-PL', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+            });
+        }
+
         function renderTransactionsTable() {
             const tbody = document.getElementById('transactionsTable');
             tbody.innerHTML = allTransactions.map((tx, index) => `
                 <tr data-tx-index="${index}">
-                    <td>${tx.date}</td>
+                    <td>${formatDate(tx.date)}</td>
                     <td>${escapeHtml(tx.payee)}</td>
                     <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${parseFloat(tx.amount).toFixed(2)}</td>
                     <td>
