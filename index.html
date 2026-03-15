@@ -1501,7 +1501,7 @@
                     payee_name: tx.payee,
                     amount: Math.round(tx.amount * 1000),
                     category_id: tx.category_id || undefined,
-                    memo: `${tx.payee} | Import Santander`
+                    memo: `${tx.payee} | Import`
                 }));
                 
                 const result = await apiPost(`/budgets/${currentBudgetId}/transactions`, {
