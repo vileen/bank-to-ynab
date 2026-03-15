@@ -270,6 +270,55 @@
             min-width: 200px;
         }
         
+        /* Searchable dropdown */
+        .searchable-select {
+            position: relative;
+            flex: 2;
+            min-width: 200px;
+        }
+        .searchable-select-input {
+            width: 100%;
+            background: #0f3460;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 10px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .searchable-select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 250px;
+            overflow-y: auto;
+            background: #0f3460;
+            border: 1px solid #333;
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            z-index: 100;
+            display: none;
+        }
+        .searchable-select-dropdown.active {
+            display: block;
+        }
+        .searchable-select-item {
+            padding: 10px;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+        }
+        .searchable-select-item:hover {
+            background: #e94560;
+        }
+        .searchable-select-item.selected {
+            background: #e94560;
+        }
+        .searchable-select-no-results {
+            padding: 10px;
+            color: #888;
+            text-align: center;
+        }
+        
         .connection-status {
             display: inline-flex;
             align-items: center;
@@ -310,9 +359,89 @@
             padding: 40px;
             color: #888;
         }
+        
+        /* Auth Modal */
+        .auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .auth-overlay.hidden {
+            display: none;
+        }
+        .auth-box {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 40px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            border: 2px solid #e94560;
+        }
+        .auth-box h2 {
+            color: #e94560;
+            margin-bottom: 10px;
+        }
+        .auth-box p {
+            color: #888;
+            margin-bottom: 20px;
+        }
+        .auth-input {
+            width: 100%;
+            background: #0f3460;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            margin-bottom: 15px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        .auth-input:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+        .auth-error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-bottom: 15px;
+            min-height: 20px;
+        }
+        .auth-btn {
+            width: 100%;
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        .auth-btn:hover {
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
+    <!-- Auth Modal -->
+    <div id="authOverlay" class="auth-overlay">
+        <div class="auth-box">
+            <h2>🔐 Wymagane logowanie</h2>
+            <p>Wprowadź hasło aby uzyskać dostęp</p>
+            <input type="password" id="authPassword" class="auth-input" placeholder="Hasło">
+            <div id="authError" class="auth-error"></div>
+            <button class="auth-btn" onclick="checkAuth()">Zaloguj</button>
+        </div>
+    </div>
+
     <h1>🏦 Bank CSV → YNAB</h1>
     <p class="subtitle">
         Importuj transakcje z banku do YNAB 
@@ -454,9 +583,14 @@
             
             <div class="add-mapping">
                 <input type="text" id="newKeyword" placeholder="Słowo kluczowe (np. lidl)">
-                <select id="newMappingCategory">
-                    <option value="">Wybierz kategorię YNAB...</option>
-                </select>
+                <div class="searchable-select" id="categoryDropdown">
+                    <input type="text" class="searchable-select-input" id="categorySearchInput" 
+                           placeholder="Wybierz kategorię YNAB..." 
+                           onclick="toggleCategoryDropdown()" 
+                           oninput="filterCategories(this.value)">
+                    <div class="searchable-select-dropdown" id="categoryDropdownList"></div>
+                    <input type="hidden" id="newMappingCategory" value="">
+                </div>
                 <button class="btn" onclick="addMapping()">Dodaj mapowanie</button>
             </div>
         </div>
@@ -500,7 +634,52 @@
             init();
         });
 
+        // === Auth ===
+        const AUTH_PASSWORD = 'f09e8b8a8fc1';
+        const AUTH_STORAGE_KEY = 'bank-to-ynab-auth';
+        
+        function checkStoredAuth() {
+            const stored = localStorage.getItem(AUTH_STORAGE_KEY);
+            if (stored === AUTH_PASSWORD) {
+                document.getElementById('authOverlay').classList.add('hidden');
+                return true;
+            }
+            return false;
+        }
+        
+        function checkAuth() {
+            const input = document.getElementById('authPassword').value;
+            const errorEl = document.getElementById('authError');
+            
+            if (input === AUTH_PASSWORD) {
+                localStorage.setItem(AUTH_STORAGE_KEY, AUTH_PASSWORD);
+                document.getElementById('authOverlay').classList.add('hidden');
+                errorEl.textContent = '';
+                // Initialize app after auth
+                initApp();
+            } else {
+                errorEl.textContent = 'Nieprawidłowe hasło';
+                document.getElementById('authPassword').value = '';
+            }
+        }
+        
+        // Allow Enter key to submit
+        document.getElementById('authPassword')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkAuth();
+        });
+        
         async function init() {
+            // Check auth first
+            if (!checkStoredAuth()) {
+                // Show auth modal - don't initialize yet
+                document.getElementById('authOverlay').classList.remove('hidden');
+                return;
+            }
+            
+            await initApp();
+        }
+        
+        async function initApp() {
             await checkConnection();
             await loadBudgets();
             await loadMappings();
@@ -629,7 +808,7 @@
         }
 
         function updateCategorySelects() {
-            // Update all category selects
+            // Update all category selects in tables
             document.querySelectorAll('.category-select').forEach(select => {
                 const currentValue = select.value;
                 select.innerHTML = '<option value="">-- Wybierz --</option>';
@@ -642,18 +821,85 @@
                 });
             });
             
-            // Update mapping category select
-            const mappingSelect = document.getElementById('newMappingCategory');
-            if (mappingSelect) {
-                mappingSelect.innerHTML = '<option value="">Wybierz kategorię YNAB...</option>';
-                ynabCategories.forEach(cat => {
-                    const option = document.createElement('option');
-                    option.value = cat.id;
-                    option.textContent = cat.name;
-                    mappingSelect.appendChild(option);
-                });
+            // Update searchable dropdown for mapping
+            renderCategoryDropdown(ynabCategories);
+        }
+        
+        // === Searchable Dropdown Functions ===
+        let selectedCategoryId = '';
+        
+        function renderCategoryDropdown(categories) {
+            const dropdown = document.getElementById('categoryDropdownList');
+            dropdown.innerHTML = '';
+            
+            categories.forEach(cat => {
+                const item = document.createElement('div');
+                item.className = 'searchable-select-item';
+                item.textContent = cat.name;
+                item.dataset.value = cat.id;
+                item.onclick = () => selectCategory(cat.id, cat.name);
+                dropdown.appendChild(item);
+            });
+        }
+        
+        function toggleCategoryDropdown() {
+            const dropdown = document.getElementById('categoryDropdownList');
+            dropdown.classList.toggle('active');
+            if (dropdown.classList.contains('active')) {
+                document.getElementById('categorySearchInput').focus();
             }
         }
+        
+        function filterCategories(searchTerm) {
+            const dropdown = document.getElementById('categoryDropdownList');
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            let hasResults = false;
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            // Show no results message if needed
+            const existingNoResults = dropdown.querySelector('.searchable-select-no-results');
+            if (!hasResults) {
+                if (!existingNoResults) {
+                    const noResults = document.createElement('div');
+                    noResults.className = 'searchable-select-no-results';
+                    noResults.textContent = 'Brak wyników';
+                    dropdown.appendChild(noResults);
+                }
+            } else if (existingNoResults) {
+                existingNoResults.remove();
+            }
+            
+            dropdown.classList.add('active');
+        }
+        
+        function selectCategory(id, name) {
+            selectedCategoryId = id;
+            document.getElementById('newMappingCategory').value = id;
+            document.getElementById('categorySearchInput').value = name;
+            document.getElementById('categoryDropdownList').classList.remove('active');
+            
+            // Update selected styling
+            document.querySelectorAll('.searchable-select-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.value === id);
+            });
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('categoryDropdown');
+            if (dropdown && !dropdown.contains(e.target)) {
+                document.getElementById('categoryDropdownList').classList.remove('active');
+            }
+        });
 
         // === CSV Parsing ===
         function parseCSVLine(line) {
@@ -887,8 +1133,11 @@
                     ynabCategoryName: category.name
                 });
                 
+                // Clear form
                 document.getElementById('newKeyword').value = '';
                 document.getElementById('newMappingCategory').value = '';
+                document.getElementById('categorySearchInput').value = '';
+                selectedCategoryId = '';
                 
                 await loadMappings();
                 await loadPayees();
