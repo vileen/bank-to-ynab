@@ -1110,8 +1110,7 @@
                     const result = await apiPost('/import', { transactions });
                     
                     document.getElementById('importResults').classList.remove('hidden');
-                    const newTransactions = result.importedTransactions - result.duplicateCount;
-                    document.getElementById('importedCount').textContent = newTransactions;
+                    document.getElementById('importedCount').textContent = result.importedTransactions || 0;
                     document.getElementById('duplicateCount').textContent = result.duplicateCount || 0;
                     document.getElementById('newPayeesCount').textContent = result.importedPayees.length;
                     document.getElementById('autoCategorizedCount').textContent = result.autoCategorized.length;
