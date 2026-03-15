@@ -184,10 +184,39 @@ async function getRecentTransactions(limit = 100) {
 }
 
 async function clearOldTransactions(days = 30) {
-  await pool.query(
-    `DELETE FROM transactions 
-     WHERE imported_at < CURRENT_TIMESTAMP - INTERVAL '${days} days'`
+  if (days === 0) {
+    // Clear all transactions
+    await pool.query('DELETE FROM transactions');
+  } else {
+    await pool.query(
+      `DELETE FROM transactions 
+       WHERE imported_at < CURRENT_TIMESTAMP - INTERVAL '${days} days'`
+    );
+  }
+}
+
+async function getUnexportedTransactions() {
+  const result = await pool.query(`
+    SELECT t.*, p.name as payee_name, p.normalized_name,
+           m.ynab_category_id, m.ynab_category_name
+    FROM transactions t
+    JOIN payees p ON p.id = t.payee_id
+    LEFT JOIN mappings m ON m.id = p.mapping_id
+    WHERE t.exported_to_ynab = FALSE
+    ORDER BY t.booking_date DESC
+  `);
+  return result.rows;
+}
+
+async function markTransactionsExported(transactionIds) {
+  const result = await pool.query(
+    `UPDATE transactions 
+     SET exported_to_ynab = TRUE 
+     WHERE id = ANY($1::int[])
+     RETURNING *`,
+    [transactionIds]
   );
+  return result.rows;
 }
 
 // === Auto-categorization ===
@@ -262,5 +291,7 @@ module.exports = {
   getRecentTransactions,
   clearOldTransactions,
   autoCategorizeTransactions,
-  getTransactionsWithCategories
+  getTransactionsWithCategories,
+  getUnexportedTransactions,
+  markTransactionsExported
 };

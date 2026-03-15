@@ -12,6 +12,25 @@ const PORT = process.env.PORT || 3003;
 const YNAB_API_KEY = process.env.YNAB_API_KEY;
 const YNAB_BASE_URL = process.env.YNAB_BASE_URL || 'https://api.youneedabudget.com/v1';
 
+// Auth config
+const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'f09e8b8a8fc1';
+
+// Auth middleware
+function requireAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
+  const token = authHeader.substring(7);
+  if (token !== AUTH_PASSWORD) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  
+  next();
+}
+
 // Middleware
 const allowedOrigins = [
   'http://localhost:8080',
@@ -33,6 +52,14 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Apply auth to all API routes except health check
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+  requireAuth(req, res, next);
+});
 
 // Helper: YNAB API client
 const ynabApi = axios.create({
@@ -283,11 +310,23 @@ app.delete('/api/mappings/:id', async (req, res) => {
   }
 });
 
-// Get transactions ready for export
-app.get('/api/transactions/export', async (req, res) => {
+// Get unexported transactions
+app.get('/api/transactions/unexported', async (req, res) => {
   try {
-    const transactions = await db.getTransactionsWithCategories();
+    const transactions = await db.getUnexportedTransactions();
     res.json({ transactions });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark transactions as exported
+app.post('/api/transactions/mark-exported', async (req, res) => {
+  try {
+    const { transactionIds } = req.body;
+    const updated = await db.markTransactionsExported(transactionIds);
+    res.json({ success: true, count: updated.length });
   } catch (error) {
     console.error('Database error:', error);
     res.status(500).json({ error: error.message });

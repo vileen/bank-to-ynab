@@ -657,6 +657,16 @@
                 🔄 Testuj połączenie
             </button>
         </div>
+        
+        <div class="card">
+            <h3>🗑️ Zarządzanie danymi</h3>
+            <p style="color: #888; margin-bottom: 15px;">
+                Wyczyść wszystkie dane transakcji i rozpocznij od nowa.
+            </p>
+            <button class="btn" onclick="clearAllData()" style="background: #e74c3c;">
+                🗑️ Wyczyść wszystkie dane
+            </button>
+        </div>
     </div>
 
     <script>
@@ -728,19 +738,38 @@
         }
 
         // === API Functions ===
+        const AUTH_TOKEN = localStorage.getItem(AUTH_STORAGE_KEY) || '';
+        
         async function apiGet(endpoint) {
-            const response = await fetch(`${API_BASE}${endpoint}`);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+            });
+            if (!response.ok) {
+                if (response.status === 401) {
+                    localStorage.removeItem(AUTH_STORAGE_KEY);
+                    location.reload();
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         }
 
         async function apiPost(endpoint, data) {
             const response = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${AUTH_TOKEN}`
+                },
                 body: JSON.stringify(data)
             });
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            if (!response.ok) {
+                if (response.status === 401) {
+                    localStorage.removeItem(AUTH_STORAGE_KEY);
+                    location.reload();
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
             return response.json();
         }
 
@@ -1095,12 +1124,8 @@
                     // Reload payees
                     await loadPayees();
                     
-                    // Use transactions from this import only (not all from DB)
-                    allTransactions = result.transactions || [];
-                    renderTransactionsTable();
-                    document.getElementById('transactionsArea').classList.remove('hidden');
-                    const accountId = document.getElementById('accountSelect').value;
-                    document.getElementById('exportBtn').disabled = !accountId || allTransactions.length === 0;
+                    // Load all unexported transactions (including previous imports)
+                    await loadUnexportedTransactions();
                     
                 } catch (err) {
                     alert('Błąd importu: ' + err.message);
@@ -1269,10 +1294,18 @@
         }
 
         // === Transactions Export ===
-        async function loadTransactionsForExport() {
+        async function loadUnexportedTransactions() {
             try {
-                const data = await apiGet('/transactions/export');
-                allTransactions = data.transactions;
+                const data = await apiGet('/transactions/unexported');
+                allTransactions = data.transactions.map(tx => ({
+                    id: tx.id,
+                    date: tx.booking_date,
+                    payee: tx.payee_name,
+                    amount: tx.amount,
+                    category_id: tx.ynab_category_id || tx.category_id,
+                    category_name: tx.ynab_category_name || 'Uncategorized',
+                    raw_data: tx.raw_data
+                }));
                 
                 document.getElementById('transactionsArea').classList.remove('hidden');
                 renderTransactionsTable();
@@ -1424,6 +1457,22 @@
             document.getElementById('exportBtn').disabled = allTransactions.length === 0;
         }
 
+        async function clearAllData() {
+            if (!confirm('⚠️ Czy na pewno chcesz wyczyścić WSZYSTKIE dane?\n\nTo usunie wszystkie transakcje, payees i mapowania.')) {
+                return;
+            }
+            
+            try {
+                await apiPost('/transactions/cleanup', { days: 0 });
+                allTransactions = [];
+                document.getElementById('transactionsArea').classList.add('hidden');
+                await loadPayees();
+                alert('✅ Wszystkie dane zostały wyczyszczone');
+            } catch (err) {
+                alert('❌ Błąd czyszczenia danych: ' + err.message);
+            }
+        }
+
         async function exportToYNAB() {
             const accountId = document.getElementById('accountSelect').value;
             if (!accountId) {
@@ -1451,6 +1500,12 @@
                 
                 const imported = result.data.transactions?.length || 0;
                 const duplicated = result.data.duplicated_import_ids?.length || 0;
+                
+                // Mark transactions as exported in our DB
+                const transactionIds = allTransactions.map(tx => tx.id).filter(id => id);
+                if (transactionIds.length > 0) {
+                    await apiPost('/transactions/mark-exported', { transactionIds });
+                }
                 
                 alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}`);
                 
