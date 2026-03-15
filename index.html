@@ -738,11 +738,13 @@
         }
 
         // === API Functions ===
-        const AUTH_TOKEN = localStorage.getItem(AUTH_STORAGE_KEY) || '';
+        function getAuthToken() {
+            return localStorage.getItem(AUTH_STORAGE_KEY) || '';
+        }
         
         async function apiGet(endpoint) {
             const response = await fetch(`${API_BASE}${endpoint}`, {
-                headers: { 'Authorization': `Bearer ${AUTH_TOKEN}` }
+                headers: { 'Authorization': `Bearer ${getAuthToken()}` }
             });
             if (!response.ok) {
                 if (response.status === 401) {
@@ -759,7 +761,7 @@
                 method: 'POST',
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${AUTH_TOKEN}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify(data)
             });
