@@ -206,6 +206,37 @@
             font-size: 12px;
             margin-top: 5px;
         }
+        .payee-category-select {
+            position: relative;
+            margin-top: 10px;
+        }
+        .payee-category-select .searchable-select-input {
+            width: 100%;
+            background: #0f3460;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .payee-category-select .searchable-select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #0f3460;
+            border: 1px solid #333;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            z-index: 50;
+            display: none;
+        }
+        .payee-category-select .searchable-select-dropdown.active {
+            display: block;
+        }
         
         /* Mapping items */
         .mapping-list {
@@ -900,7 +931,55 @@
             if (dropdown && !dropdown.contains(e.target)) {
                 document.getElementById('categoryDropdownList').classList.remove('active');
             }
+            
+            // Close payee dropdowns
+            document.querySelectorAll('.payee-category-select .searchable-select-dropdown').forEach(dd => {
+                if (!dd.parentElement.contains(e.target)) {
+                    dd.classList.remove('active');
+                }
+            });
         });
+        
+        // === Payee Category Dropdown Functions ===
+        function togglePayeeDropdown(payeeId) {
+            const dropdown = document.getElementById(`payee-dropdown-${payeeId}`);
+            // Close all other payee dropdowns
+            document.querySelectorAll('.payee-category-select .searchable-select-dropdown').forEach(dd => {
+                if (dd.id !== `payee-dropdown-${payeeId}`) {
+                    dd.classList.remove('active');
+                }
+            });
+            dropdown.classList.toggle('active');
+        }
+        
+        function filterPayeeCategories(payeeId, searchTerm) {
+            const dropdown = document.getElementById(`payee-dropdown-${payeeId}`);
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            let hasResults = false;
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            dropdown.classList.add('active');
+        }
+        
+        function selectPayeeCategory(payeeId, categoryId, categoryName) {
+            const input = document.querySelector(`.payee-card[data-payee-id="${payeeId}"] .searchable-select-input`);
+            if (input) {
+                input.value = categoryName;
+            }
+            document.getElementById(`payee-dropdown-${payeeId}`).classList.remove('active');
+            
+            // Call assignCategory
+            assignCategory(payeeId, categoryId);
+        }
 
         // === CSV Parsing ===
         function parseCSVLine(line) {
@@ -1029,13 +1108,24 @@
                     unmappedContainer.innerHTML = '<div class="empty-state">🎉 Wszystkie payees mają przypisane kategorie!</div>';
                 } else {
                     unmappedContainer.innerHTML = unmappedPayees.map(payee => `
-                        <div class="payee-card unmapped">
+                        <div class="payee-card unmapped" data-payee-id="${payee.id}">
                             <div class="payee-name">${escapeHtml(payee.name)}</div>
                             <div class="payee-count">${payee.transaction_count} transakcji</div>
-                            <select class="category-select" onchange="assignCategory(${payee.id}, this.value)">
-                                <option value="">Wybierz kategorię...</option>
-                                ${ynabCategories.map(cat => `<option value="${cat.id}">${escapeHtml(cat.name)}</option>`).join('')}
-                            </select>
+                            <div class="searchable-select payee-category-select" data-payee-id="${payee.id}">
+                                <input type="text" class="searchable-select-input" 
+                                       placeholder="Wybierz kategorię..." 
+                                       onclick="togglePayeeDropdown(${payee.id})" 
+                                       oninput="filterPayeeCategories(${payee.id}, this.value)">
+                                <div class="searchable-select-dropdown" id="payee-dropdown-${payee.id}">
+                                    ${ynabCategories.map(cat => `
+                                        <div class="searchable-select-item" 
+                                             data-value="${cat.id}" 
+                                             onclick="selectPayeeCategory(${payee.id}, '${cat.id}', '${escapeHtml(cat.name)}')">
+                                            ${escapeHtml(cat.name)}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
                         </div>
                     `).join('');
                 }
