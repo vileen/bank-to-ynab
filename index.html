@@ -1498,7 +1498,6 @@
                 const ynabTransactions = allTransactions.map(tx => ({
                     account_id: accountId,
                     date: tx.date,
-                    payee_name: tx.payee,
                     amount: Math.round(tx.amount * 1000),
                     category_id: tx.category_id || undefined,
                     memo: `${tx.payee} | Import`
