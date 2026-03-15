@@ -1090,7 +1090,7 @@
                 let amount = 0;
                 
                 // Check for Format 1: separate debit/credit columns
-                const isNumber = (s: string) => /^-?\d[\d\s]*[,.]\d{2}$/.test(s.replace(/\s/g, ''));
+                const isNumber = (s) => /^-?\d[\d\s]*[,.]\d{2}$/.test(s.replace(/\s/g, ''));
                 const hasDebit = col3 && isNumber(col3) && parseFloat(col3.replace(/\s/g, '').replace(',', '.')) !== 0;
                 const hasCredit = col4 && isNumber(col4) && parseFloat(col4.replace(/\s/g, '').replace(',', '.')) !== 0;
                 
