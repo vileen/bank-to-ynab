@@ -1074,10 +1074,45 @@
 
                 const bookingDate = cols[0]?.trim();
                 const payee = cols[2]?.trim();
-                const amountStr = cols[5]?.trim();
+                
+                // Santander CSV format detection:
+                // Format 1: cols[3]=obciążenie (debit/-), cols[4]=uznanie (credit/+), cols[5]=saldo
+                // Format 2: cols[4]=amount (signed), cols[5]=saldo
+                // Format 3: cols[5]=amount (signed)
+                
+                const col3 = cols[3]?.trim() || '';
+                const col4 = cols[4]?.trim() || '';
+                const col5 = cols[5]?.trim() || '';
+                
+                let amountStr = '';
+                let amount = 0;
+                
+                // Check for Format 1: separate debit/credit columns
+                const isNumber = (s: string) => /^-?\d[\d\s]*[,.]\d{2}$/.test(s.replace(/\s/g, ''));
+                const hasDebit = col3 && isNumber(col3) && parseFloat(col3.replace(/\s/g, '').replace(',', '.')) !== 0;
+                const hasCredit = col4 && isNumber(col4) && parseFloat(col4.replace(/\s/g, '').replace(',', '.')) !== 0;
+                
+                if (hasDebit && !hasCredit) {
+                    // Only debit - expense
+                    amountStr = '-' + col3.replace(/^-/, '');
+                } else if (!hasDebit && hasCredit) {
+                    // Only credit - income/refund
+                    amountStr = col4.replace(/^-/, '');
+                } else if (hasDebit && hasCredit) {
+                    // Both present - use non-zero one
+                    amountStr = hasDebit ? col3 : col4;
+                } else {
+                    // Format 2/3: signed amount in cols[4] or cols[5]
+                    amountStr = col4 && isNumber(col4) ? col4 : col5;
+                }
+                
+                if (!amountStr) {
+                    amountStr = col5;
+                }
 
                 if (!payee || !amountStr) continue;
 
+                // Parse amount, preserving sign
                 const amount = parseAmount(amountStr);
                 const date = parseDate(bookingDate);
 
