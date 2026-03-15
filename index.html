@@ -509,9 +509,14 @@
             </div>
             <div class="settings-row">
                 <label>Konto:</label>
-                <select id="accountSelect">
-                    <option value="">Wybierz konto...</option>
-                </select>
+                <div class="searchable-select" id="accountDropdown" style="flex: 1;">
+                    <input type="text" class="searchable-select-input" id="accountSearchInput" 
+                           placeholder="Wybierz konto..." 
+                           onclick="toggleAccountDropdown()" 
+                           oninput="filterAccounts(this.value)">
+                    <div class="searchable-select-dropdown" id="accountDropdownList"></div>
+                    <input type="hidden" id="accountSelect" value="">
+                </div>
             </div>
         </div>
 
@@ -825,19 +830,16 @@
             // Load accounts
             try {
                 const accData = await apiGet(`/budgets/${budgetId}/accounts`);
-                const accSelect = document.getElementById('accountSelect');
-                accSelect.innerHTML = '<option value="">Wybierz konto...</option>';
+                ynabAccounts = accData.data.accounts.filter(acc => !acc.closed);
                 
-                accData.data.accounts.forEach(acc => {
-                    if (!acc.closed) {
-                        const option = document.createElement('option');
-                        option.value = acc.id;
-                        option.textContent = acc.name;
-                        accSelect.appendChild(option);
-                    }
-                });
+                // Update searchable dropdown for accounts
+                renderAccountDropdown(ynabAccounts);
                 
-                ynabAccounts = accData.data.accounts;
+                // Reset selection
+                selectedAccountId = '';
+                document.getElementById('accountSelect').value = '';
+                document.getElementById('accountSearchInput').value = '';
+                document.getElementById('exportBtn').disabled = true;
             } catch (err) {
                 console.error('Failed to load accounts:', err);
             }
@@ -934,6 +936,12 @@
             const dropdown = document.getElementById('categoryDropdown');
             if (dropdown && !dropdown.contains(e.target)) {
                 document.getElementById('categoryDropdownList').classList.remove('active');
+            }
+            
+            // Close account dropdown
+            const accountDropdown = document.getElementById('accountDropdown');
+            if (accountDropdown && !accountDropdown.contains(e.target)) {
+                document.getElementById('accountDropdownList').classList.remove('active');
             }
             
             // Close payee dropdowns
@@ -1350,6 +1358,70 @@
             row.querySelectorAll('.searchable-select-item').forEach(item => {
                 item.classList.toggle('selected', item.dataset.value === categoryId);
             });
+        }
+        
+        // === Account Dropdown Functions ===
+        let selectedAccountId = '';
+        
+        function renderAccountDropdown(accounts) {
+            const dropdown = document.getElementById('accountDropdownList');
+            dropdown.innerHTML = '';
+            
+            accounts.forEach(acc => {
+                if (acc.closed) return;
+                const item = document.createElement('div');
+                item.className = 'searchable-select-item';
+                item.textContent = acc.name;
+                item.dataset.value = acc.id;
+                item.onclick = () => selectAccount(acc.id, acc.name);
+                dropdown.appendChild(item);
+            });
+        }
+        
+        function toggleAccountDropdown() {
+            const dropdown = document.getElementById('accountDropdownList');
+            // Close other dropdowns
+            document.getElementById('categoryDropdownList').classList.remove('active');
+            document.querySelectorAll('.payee-category-select .searchable-select-dropdown').forEach(dd => {
+                dd.classList.remove('active');
+            });
+            document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
+                dd.classList.remove('active');
+            });
+            dropdown.classList.toggle('active');
+        }
+        
+        function filterAccounts(searchTerm) {
+            const dropdown = document.getElementById('accountDropdownList');
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            let hasResults = false;
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            dropdown.classList.add('active');
+        }
+        
+        function selectAccount(id, name) {
+            selectedAccountId = id;
+            document.getElementById('accountSelect').value = id;
+            document.getElementById('accountSearchInput').value = name;
+            document.getElementById('accountDropdownList').classList.remove('active');
+            
+            // Update selected styling
+            document.querySelectorAll('#accountDropdownList .searchable-select-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.value === id);
+            });
+            
+            // Enable/disable export button
+            document.getElementById('exportBtn').disabled = allTransactions.length === 0;
         }
 
         async function exportToYNAB() {
