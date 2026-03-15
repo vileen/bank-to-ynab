@@ -117,6 +117,7 @@ app.post('/api/import', async (req, res) => {
     const { transactions } = req.body;
     const importedPayees = [];
     const importedTransactions = [];
+    let duplicateCount = 0;
     
     for (const tx of transactions) {
       // Get or create payee
@@ -142,17 +143,44 @@ app.post('/api/import', async (req, res) => {
         tx.categoryId
       );
       
-      importedTransactions.push(transaction);
+      if (transaction.isDuplicate) {
+        duplicateCount++;
+      } else {
+        // Add to this import's transactions list
+        importedTransactions.push({
+          id: transaction.id,
+          payee_id: payee.id,
+          payee: payee.name,
+          date: tx.date,
+          amount: tx.amount,
+          category_id: null,
+          category_name: 'Uncategorized',
+          raw_data: tx.rawData
+        });
+      }
     }
     
-    // Run auto-categorization
+    // Run auto-categorization and apply to current import
     const autoCategorized = await db.autoCategorizeTransactions();
+    
+    // Apply auto-categories to current import list
+    importedTransactions.forEach(tx => {
+      const autoMatch = autoCategorized.find(ac => ac.payee_id === tx.payee_id);
+      if (autoMatch) {
+        tx.category_id = autoMatch.ynab_category_id;
+        tx.category_name = autoMatch.ynab_category_name;
+      }
+    });
     
     res.json({
       success: true,
       importedPayees,
       importedTransactions: importedTransactions.length,
-      autoCategorized
+      duplicateCount,
+      transactions: importedTransactions,
+      autoCategorized: autoCategorized.filter(ac => 
+        importedTransactions.some(it => it.payee_id === ac.payee_id)
+      )
     });
   } catch (error) {
     console.error('Import error:', error);

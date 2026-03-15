@@ -148,6 +148,18 @@ async function findPayeesByKeyword(keyword) {
 // === Transactions ===
 
 async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null) {
+  // Check for duplicate transaction (same payee, date, and amount)
+  const checkResult = await pool.query(
+    `SELECT * FROM transactions 
+     WHERE payee_id = $1 AND booking_date = $2 AND amount = $3`,
+    [payeeId, bookingDate, amount]
+  );
+  
+  if (checkResult.rows.length > 0) {
+    // Duplicate found, return existing transaction
+    return { ...checkResult.rows[0], isDuplicate: true };
+  }
+  
   const result = await pool.query(
     `INSERT INTO transactions 
      (payee_id, booking_date, operation_date, amount, raw_data, category_id) 
@@ -155,7 +167,7 @@ async function createTransaction(payeeId, bookingDate, operationDate, amount, ra
      RETURNING *`,
     [payeeId, bookingDate, operationDate, amount, JSON.stringify(rawData), categoryId]
   );
-  return result.rows[0];
+  return { ...result.rows[0], isDuplicate: false };
 }
 
 async function getRecentTransactions(limit = 100) {

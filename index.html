@@ -532,7 +532,11 @@
                 <div class="stats">
                     <div class="stat-box">
                         <div class="stat-value" id="importedCount">0</div>
-                        <div class="stat-label">Transakcje</div>
+                        <div class="stat-label">Nowe transakcje</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="duplicateCount">0</div>
+                        <div class="stat-label">Duplikaty</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-value" id="newPayeesCount">0</div>
@@ -1069,7 +1073,9 @@
                     const result = await apiPost('/import', { transactions });
                     
                     document.getElementById('importResults').classList.remove('hidden');
-                    document.getElementById('importedCount').textContent = result.importedTransactions;
+                    const newTransactions = result.importedTransactions - result.duplicateCount;
+                    document.getElementById('importedCount').textContent = newTransactions;
+                    document.getElementById('duplicateCount').textContent = result.duplicateCount || 0;
                     document.getElementById('newPayeesCount').textContent = result.importedPayees.length;
                     document.getElementById('autoCategorizedCount').textContent = result.autoCategorized.length;
                     
@@ -1081,8 +1087,12 @@
                     // Reload payees
                     await loadPayees();
                     
-                    // Load transactions for export
-                    await loadTransactionsForExport();
+                    // Use transactions from this import only (not all from DB)
+                    allTransactions = result.transactions || [];
+                    renderTransactionsTable();
+                    document.getElementById('transactionsArea').classList.remove('hidden');
+                    const accountId = document.getElementById('accountSelect').value;
+                    document.getElementById('exportBtn').disabled = !accountId || allTransactions.length === 0;
                     
                 } catch (err) {
                     alert('Błąd importu: ' + err.message);
@@ -1268,14 +1278,78 @@
 
         function renderTransactionsTable() {
             const tbody = document.getElementById('transactionsTable');
-            tbody.innerHTML = allTransactions.map(tx => `
-                <tr>
+            tbody.innerHTML = allTransactions.map((tx, index) => `
+                <tr data-tx-index="${index}">
                     <td>${tx.date}</td>
                     <td>${escapeHtml(tx.payee)}</td>
                     <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${parseFloat(tx.amount).toFixed(2)}</td>
-                    <td>${escapeHtml(tx.category_name)}</td>
+                    <td>
+                        <div class="searchable-select tx-category-select" style="min-width: 200px;">
+                            <input type="text" class="searchable-select-input" 
+                                   value="${escapeHtml(tx.category_name === 'Uncategorized' ? '' : tx.category_name)}"
+                                   placeholder="Wybierz kategorię..."
+                                   onclick="toggleTxDropdown(${index})" 
+                                   oninput="filterTxCategories(${index}, this.value)">
+                            <div class="searchable-select-dropdown" id="tx-dropdown-${index}">
+                                ${ynabCategories.map(cat => `
+                                    <div class="searchable-select-item ${cat.id === tx.category_id ? 'selected' : ''}" 
+                                         data-value="${cat.id}" 
+                                         onclick="selectTxCategory(${index}, '${cat.id}', '${escapeHtml(cat.name)}')">
+                                        ${escapeHtml(cat.name)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </td>
                 </tr>
             `).join('');
+        }
+        
+        // === Transaction Category Dropdown Functions ===
+        function toggleTxDropdown(index) {
+            const dropdown = document.getElementById(`tx-dropdown-${index}`);
+            // Close all other tx dropdowns
+            document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
+                if (dd.id !== `tx-dropdown-${index}`) {
+                    dd.classList.remove('active');
+                }
+            });
+            dropdown.classList.toggle('active');
+        }
+        
+        function filterTxCategories(index, searchTerm) {
+            const dropdown = document.getElementById(`tx-dropdown-${index}`);
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            dropdown.classList.add('active');
+        }
+        
+        function selectTxCategory(index, categoryId, categoryName) {
+            // Update transaction in memory
+            allTransactions[index].category_id = categoryId;
+            allTransactions[index].category_name = categoryName;
+            
+            // Update input value
+            const row = document.querySelector(`tr[data-tx-index="${index}"]`);
+            const input = row.querySelector('.searchable-select-input');
+            input.value = categoryName;
+            
+            // Close dropdown
+            document.getElementById(`tx-dropdown-${index}`).classList.remove('active');
+            
+            // Update selected styling
+            row.querySelectorAll('.searchable-select-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.value === categoryId);
+            });
         }
 
         async function exportToYNAB() {
