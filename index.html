@@ -683,6 +683,7 @@
         let ynabAccounts = [];
         let allTransactions = [];
         let unmappedPayees = [];
+        let mappedPayees = [];
         
         // === Initialization ===
         document.addEventListener('DOMContentLoaded', () => {
@@ -1029,6 +1030,70 @@
             assignCategory(payeeId, categoryId);
         }
 
+        // === Mapped Payee Category Functions ===
+        function toggleMappedPayeeDropdown(payeeId) {
+            const dropdown = document.getElementById(`mapped-payee-dropdown-${payeeId}`);
+            dropdown.classList.toggle('active');
+        }
+        
+        function filterMappedPayeeCategories(payeeId, searchTerm) {
+            const dropdown = document.getElementById(`mapped-payee-dropdown-${payeeId}`);
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            let hasResults = false;
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            dropdown.classList.add('active');
+        }
+        
+        async function updateMappedPayeeCategory(payeeId, categoryId, categoryName) {
+            const input = document.querySelector(`.payee-card.mapped[data-payee-id="${payeeId}"] .searchable-select-input`);
+            if (input) {
+                input.value = categoryName;
+            }
+            document.getElementById(`mapped-payee-dropdown-${payeeId}`).classList.remove('active');
+            
+            const category = ynabCategories.find(c => c.id === categoryId);
+            if (!category) return;
+            
+            try {
+                // Get payee info for keyword extraction
+                const allPayees = [...unmappedPayees, ...mappedPayees];
+                const payee = allPayees.find(p => p.id === payeeId);
+                if (!payee) return;
+                
+                // Create new mapping
+                const keyword = payee.normalized_name?.split(' ')[0] || payee.name.split(' ')[0];
+                const mappingResult = await apiPost('/mappings', {
+                    keyword: keyword,
+                    ynabCategoryId: categoryId,
+                    ynabCategoryName: category.name
+                });
+                
+                // Assign payee to the new mapping
+                if (mappingResult.mapping?.id) {
+                    await apiPost(`/payees/${payeeId}/mapping`, {
+                        mappingId: mappingResult.mapping.id
+                    });
+                }
+                
+                // Reload data
+                await loadPayees();
+                await loadUnexportedTransactions();
+                
+            } catch (err) {
+                alert('Błąd aktualizacji kategorii: ' + err.message);
+            }
+        }
+
         // === CSV Parsing ===
         function parseCSVLine(line) {
             const result = [];
@@ -1182,6 +1247,7 @@
             try {
                 const data = await apiGet('/payees');
                 unmappedPayees = data.withoutMapping;
+                mappedPayees = data.withMapping;
                 
                 // Update badge
                 const badge = document.getElementById('unmappedCount');
@@ -1225,10 +1291,25 @@
                     mappedContainer.innerHTML = '<div class="empty-state">Brak zmapowanych payees</div>';
                 } else {
                     mappedContainer.innerHTML = data.withMapping.map(payee => `
-                        <div class="payee-card mapped">
+                        <div class="payee-card mapped" data-payee-id="${payee.id}">
                             <div class="payee-name">${escapeHtml(payee.name)}</div>
                             <div class="payee-count">${payee.transaction_count} transakcji</div>
-                            <div class="payee-category">${escapeHtml(payee.ynab_category_name || 'Uncategorized')}</div>
+                            <div class="searchable-select payee-category-select" data-payee-id="${payee.id}">
+                                <input type="text" class="searchable-select-input" 
+                                       value="${escapeHtml(payee.ynab_category_name || '')}"
+                                       placeholder="Wybierz kategorię..." 
+                                       onclick="toggleMappedPayeeDropdown(${payee.id})" 
+                                       oninput="filterMappedPayeeCategories(${payee.id}, this.value)">
+                                <div class="searchable-select-dropdown" id="mapped-payee-dropdown-${payee.id}">
+                                    ${ynabCategories.map(cat => `
+                                        <div class="searchable-select-item ${cat.id === payee.ynab_category_id ? 'selected' : ''}" 
+                                             data-value="${cat.id}" 
+                                             onclick="updateMappedPayeeCategory(${payee.id}, '${cat.id}', '${escapeHtml(cat.name)}')">
+                                            ${escapeHtml(cat.name)}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
                         </div>
                     `).join('');
                 }
