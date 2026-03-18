@@ -1253,8 +1253,9 @@
                     ynabCategoryName: category.name
                 });
                 
-                // Reload payees
+                // Reload payees and transactions (to reflect new category mapping)
                 await loadPayees();
+                await loadUnexportedTransactions();
                 
             } catch (err) {
                 alert('Błąd przypisywania kategorii: ' + err.message);
@@ -1318,6 +1319,7 @@
                 
                 await loadMappings();
                 await loadPayees();
+                await loadUnexportedTransactions();
                 
             } catch (err) {
                 alert('Błąd zapisywania mapowania: ' + err.message);
@@ -1331,6 +1333,7 @@
                 await apiDelete(`/mappings/${id}`);
                 await loadMappings();
                 await loadPayees();
+                await loadUnexportedTransactions();
             } catch (err) {
                 alert('Błąd usuwania mapowania: ' + err.message);
             }
