@@ -333,6 +333,17 @@ app.post('/api/transactions/mark-exported', async (req, res) => {
   }
 });
 
+// Get last exported transaction date
+app.get('/api/transactions/last-exported', async (req, res) => {
+  try {
+    const lastExportDate = await db.getLastExportedTransactionDate();
+    res.json({ lastExportDate });
+  } catch (error) {
+    console.error('Database error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Clear old transactions
 app.post('/api/transactions/cleanup', async (req, res) => {
   try {

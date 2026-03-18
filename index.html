@@ -740,7 +740,7 @@
             await loadBudgets();
             await loadMappings();
             await loadPayees();
-            updateLastExportLabel();
+            await updateLastExportLabel();
         }
 
         // === API Functions ===
@@ -1439,7 +1439,7 @@
                 
                 document.getElementById('transactionsArea').classList.remove('hidden');
                 renderTransactionsTable();
-                updateLastExportLabel();
+                await updateLastExportLabel();
                 
                 const accountId = document.getElementById('accountSelect').value;
                 document.getElementById('exportBtn').disabled = !accountId || allTransactions.length === 0;
@@ -1448,13 +1448,32 @@
             }
         }
 
-        function updateLastExportLabel() {
-            const lastExportDate = localStorage.getItem('bankToYnab_lastExportDate');
+        async function updateLastExportLabel() {
             const label = document.getElementById('lastExportDate');
-            if (lastExportDate) {
-                label.textContent = `Ostatnia transakcja: ${formatDate(lastExportDate)}`;
-            } else {
-                label.textContent = '';
+            try {
+                // Fetch last export date from backend
+                const data = await apiGet('/transactions/last-exported');
+                if (data.lastExportDate) {
+                    label.textContent = `Ostatnia transakcja: ${formatDate(data.lastExportDate)}`;
+                    // Update localStorage to match backend
+                    localStorage.setItem('bankToYnab_lastExportDate', data.lastExportDate);
+                } else {
+                    // Fall back to localStorage
+                    const lastExportDate = localStorage.getItem('bankToYnab_lastExportDate');
+                    if (lastExportDate) {
+                        label.textContent = `Ostatnia transakcja: ${formatDate(lastExportDate)}`;
+                    } else {
+                        label.textContent = '';
+                    }
+                }
+            } catch (err) {
+                // Fall back to localStorage on error
+                const lastExportDate = localStorage.getItem('bankToYnab_lastExportDate');
+                if (lastExportDate) {
+                    label.textContent = `Ostatnia transakcja: ${formatDate(lastExportDate)}`;
+                } else {
+                    label.textContent = '';
+                }
             }
         }
 
@@ -1663,7 +1682,7 @@
                     ? allTransactions[0].date 
                     : new Date().toISOString().split('T')[0];
                 localStorage.setItem('bankToYnab_lastExportDate', lastExportDate);
-                updateLastExportLabel();
+                await updateLastExportLabel();
                 
                 alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}`);
                 

@@ -210,13 +210,22 @@ async function getUnexportedTransactions() {
 
 async function markTransactionsExported(transactionIds) {
   const result = await pool.query(
-    `UPDATE transactions 
-     SET exported_to_ynab = TRUE 
+    `UPDATE transactions
+     SET exported_to_ynab = TRUE
      WHERE id = ANY($1::int[])
      RETURNING *`,
     [transactionIds]
   );
   return result.rows;
+}
+
+async function getLastExportedTransactionDate() {
+  const result = await pool.query(`
+    SELECT MAX(booking_date) as last_export_date
+    FROM transactions
+    WHERE exported_to_ynab = TRUE
+  `);
+  return result.rows[0]?.last_export_date || null;
 }
 
 // === Auto-categorization ===
@@ -293,5 +302,6 @@ module.exports = {
   autoCategorizeTransactions,
   getTransactionsWithCategories,
   getUnexportedTransactions,
-  markTransactionsExported
+  markTransactionsExported,
+  getLastExportedTransactionDate
 };
