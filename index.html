@@ -1188,6 +1188,9 @@
                 badge.textContent = unmappedPayees.length;
                 badge.classList.toggle('hidden', unmappedPayees.length === 0);
                 
+                // Hide new payees alert when all are mapped
+                document.getElementById('newPayeesAlert').classList.toggle('hidden', unmappedPayees.length === 0);
+                
                 // Render unmapped payees
                 const unmappedContainer = document.getElementById('unmappedPayeesList');
                 if (unmappedPayees.length === 0) {
