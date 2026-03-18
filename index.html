@@ -1124,9 +1124,12 @@
 
                 if (isNaN(amount) || isNaN(date.getTime())) continue;
 
+                const operationDateStr = cols[1]?.trim();
+                const operationDate = operationDateStr ? parseDate(operationDateStr) : null;
+                
                 transactions.push({
                     date: date.toISOString().split('T')[0],
-                    operationDate: cols[1]?.trim(),
+                    operationDate: operationDate ? operationDate.toISOString().split('T')[0] : null,
                     payee: payee,
                     amount: amount,
                     rawData: { cols }
