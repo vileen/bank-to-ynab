@@ -521,6 +521,13 @@
             </div>
         </div>
 
+        <div class="card" id="lastExportCard" style="display: none;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #888;">📅 Ostatnia zeksportowana transakcja:</span>
+                <span id="lastExportDateMain" style="color: #e94560; font-weight: 600;">-</span>
+            </div>
+        </div>
+
         <div class="card">
             <label class="upload-area" id="dropZone">
                 <input type="file" id="csvFile" accept=".csv" onchange="handleFile(event)">
@@ -566,7 +573,7 @@
                 <div class="section-header">
                     <h3>📋 Transakcje do eksportu</h3>
                     <div style="display: flex; align-items: center; gap: 15px;">
-                        <span id="lastExportDate" style="color: #888; font-size: 13px;"></span>
+                        <span id="lastExportDate" style="color: #e94560; font-size: 13px; font-weight: 500;"></span>
                         <button class="btn" onclick="exportToYNAB()" id="exportBtn" disabled>
                             📥 Eksportuj do YNAB
                         </button>
@@ -1450,29 +1457,42 @@
 
         async function updateLastExportLabel() {
             const label = document.getElementById('lastExportDate');
+            const mainLabel = document.getElementById('lastExportDateMain');
+            const card = document.getElementById('lastExportCard');
+            
+            let exportDate = null;
+            
             try {
                 // Fetch last export date from backend
                 const data = await apiGet('/transactions/last-exported');
                 if (data.lastExportDate) {
-                    label.textContent = `Ostatnia transakcja: ${formatDate(data.lastExportDate)}`;
-                    // Update localStorage to match backend
-                    localStorage.setItem('bankToYnab_lastExportDate', data.lastExportDate);
-                } else {
-                    // Fall back to localStorage
-                    const lastExportDate = localStorage.getItem('bankToYnab_lastExportDate');
-                    if (lastExportDate) {
-                        label.textContent = `Ostatnia transakcja: ${formatDate(lastExportDate)}`;
-                    } else {
-                        label.textContent = '';
-                    }
+                    exportDate = data.lastExportDate;
+                    localStorage.setItem('bankToYnab_lastExportDate', exportDate);
                 }
             } catch (err) {
                 // Fall back to localStorage on error
-                const lastExportDate = localStorage.getItem('bankToYnab_lastExportDate');
-                if (lastExportDate) {
-                    label.textContent = `Ostatnia transakcja: ${formatDate(lastExportDate)}`;
+                exportDate = localStorage.getItem('bankToYnab_lastExportDate');
+            }
+            
+            const displayDate = exportDate ? formatDate(exportDate) : null;
+            
+            // Update transactions section label
+            if (label) {
+                if (displayDate) {
+                    label.textContent = `Ostatnia transakcja: ${displayDate}`;
                 } else {
-                    label.textContent = '';
+                    label.textContent = 'Brak wcześniejszych eksportów';
+                }
+            }
+            
+            // Update main Import tab label
+            if (mainLabel && card) {
+                if (displayDate) {
+                    mainLabel.textContent = displayDate;
+                    card.style.display = 'block';
+                } else {
+                    mainLabel.textContent = '-';
+                    card.style.display = 'none';
                 }
             }
         }
