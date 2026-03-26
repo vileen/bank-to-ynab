@@ -144,6 +144,7 @@ app.post('/api/import', async (req, res) => {
     const { transactions } = req.body;
     const importedPayees = [];
     const importedTransactions = [];
+    const duplicates = [];
     let duplicateCount = 0;
     
     for (const tx of transactions) {
@@ -172,6 +173,18 @@ app.post('/api/import', async (req, res) => {
       
       if (transaction.isDuplicate) {
         duplicateCount++;
+        duplicates.push({
+          payee: payee.name,
+          date: tx.date,
+          amount: tx.amount,
+          existingId: transaction.id
+        });
+        console.log('[IMPORT DUPLICATE]', {
+          payee: payee.name,
+          date: tx.date,
+          amount: tx.amount,
+          existingId: transaction.id
+        });
       } else {
         // Add to this import's transactions list
         importedTransactions.push({
@@ -204,8 +217,9 @@ app.post('/api/import', async (req, res) => {
       importedPayees,
       importedTransactions: importedTransactions.length,
       duplicateCount,
+      duplicates,
       transactions: importedTransactions,
-      autoCategorized: autoCategorized.filter(ac => 
+      autoCategorized: autoCategorized.filter(ac =>
         importedTransactions.some(it => it.payee_id === ac.payee_id)
       )
     });
