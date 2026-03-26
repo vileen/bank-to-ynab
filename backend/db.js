@@ -150,25 +150,14 @@ async function findPayeesByKeyword(keyword) {
 async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null) {
   // Check for duplicate transaction (same payee, date, and amount)
   const checkResult = await pool.query(
-    `SELECT t.*, p.name as payee_name 
-     FROM transactions t
-     JOIN payees p ON p.id = t.payee_id
-     WHERE t.payee_id = $1 AND t.booking_date = $2 AND t.amount = $3`,
+    `SELECT * FROM transactions 
+     WHERE payee_id = $1 AND booking_date = $2 AND amount = $3`,
     [payeeId, bookingDate, amount]
   );
-
+  
   if (checkResult.rows.length > 0) {
-    // Duplicate found, log details
-    const existing = checkResult.rows[0];
-    console.log('[DUPLICATE DETECTED]', {
-      payee: existing.payee_name,
-      date: bookingDate,
-      amount: amount,
-      existingId: existing.id,
-      existingImportedAt: existing.imported_at,
-      newRawData: rawData?.cols?.slice(0, 3)
-    });
-    return { ...existing, isDuplicate: true };
+    // Duplicate found, return existing transaction
+    return { ...checkResult.rows[0], isDuplicate: true };
   }
   
   const result = await pool.query(
