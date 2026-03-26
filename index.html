@@ -1505,13 +1505,11 @@
 
         function formatDate(dateStr) {
             if (!dateStr) return '';
-            const date = new Date(dateStr);
-            if (isNaN(date.getTime())) return dateStr;
-            return date.toLocaleDateString('pl-PL', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric'
-            });
+            // dateStr is already in YYYY-MM-DD format, parse manually
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            // Return as DD.MM.YYYY
+            return `${parts[2]}.${parts[1]}.${parts[0]}`;
         }
 
         function renderTransactionsTable() {
