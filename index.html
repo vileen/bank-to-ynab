@@ -1163,8 +1163,14 @@
         }
 
         function parseDate(dateStr) {
+            // Parse date in format DD-MM-YYYY
+            // Return as YYYY-MM-DD string to avoid timezone issues
             const parts = dateStr.split('-');
-            return new Date(parts[2], parts[1] - 1, parts[0]);
+            if (parts.length !== 3) return null;
+            const day = parts[0].padStart(2, '0');
+            const month = parts[1].padStart(2, '0');
+            const year = parts[2];
+            return `${year}-${month}-${day}`;
         }
 
         function parseSantanderCSV(csvText) {
@@ -1229,14 +1235,14 @@
                 const amount = parseAmount(amountStr);
                 const date = parseDate(bookingDate);
 
-                if (isNaN(amount) || isNaN(date.getTime())) continue;
+                if (isNaN(amount) || !date) continue;
 
                 const operationDateStr = cols[1]?.trim();
                 const operationDate = operationDateStr ? parseDate(operationDateStr) : null;
-                
+
                 transactions.push({
-                    date: date.toISOString().split('T')[0],
-                    operationDate: operationDate ? operationDate.toISOString().split('T')[0] : null,
+                    date: date,
+                    operationDate: operationDate ? operationDate : null,
                     payee: payee,
                     amount: amount,
                     rawData: { cols }
