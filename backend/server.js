@@ -206,10 +206,10 @@ app.post('/api/import', async (req, res) => {
     
     // Apply auto-categories to current import list
     importedTransactions.forEach(tx => {
-      const autoMatch = autoCategorized.find(ac => ac.payee_id === tx.payee_id);
+      const autoMatch = autoCategorized.find(ac => ac.payeeId === tx.payee_id);
       if (autoMatch) {
-        tx.category_id = autoMatch.ynab_category_id;
-        tx.category_name = autoMatch.ynab_category_name;
+        tx.category_id = autoMatch.ynabCategoryId;
+        tx.category_name = autoMatch.categoryName;
       }
     });
     
@@ -227,7 +227,7 @@ app.post('/api/import', async (req, res) => {
       duplicates,
       transactions: importedTransactions,
       autoCategorized: autoCategorized.filter(ac =>
-        importedTransactions.some(it => it.payee_id === ac.payee_id)
+        importedTransactions.some(it => it.payee_id === ac.payeeId)
       ),
       potentialDuplicates: potentialDuplicates.map(pd => ({
         id: pd.id,

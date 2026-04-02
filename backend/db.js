@@ -283,6 +283,7 @@ async function autoCategorizeTransactions() {
         categorized.push({
           payeeId: payee.id,
           keyword: keyword,
+          ynabCategoryId: mapping.ynabCategoryId,
           categoryName: mapping.ynabCategoryName
         });
         break;
