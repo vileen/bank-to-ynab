@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     exported_to_ynab BOOLEAN DEFAULT FALSE
 );
 
+-- Add import_batch_id column to transactions (for tracking CSV import batches)
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS import_batch_id VARCHAR(255);
+CREATE INDEX IF NOT EXISTS idx_transactions_import_batch ON transactions(import_batch_id);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_payees_mapping ON payees(mapping_id);
 CREATE INDEX IF NOT EXISTS idx_payees_normalized ON payees(normalized_name);

@@ -141,7 +141,7 @@ app.post('/api/budgets/:budgetId/transactions', async (req, res) => {
 // Import transactions from CSV
 app.post('/api/import', async (req, res) => {
   try {
-    const { transactions } = req.body;
+    const { transactions, importBatchId } = req.body;
     const importedPayees = [];
     const importedTransactions = [];
     const duplicates = [];
@@ -161,14 +161,15 @@ app.post('/api/import', async (req, res) => {
         });
       }
       
-      // Create transaction
+      // Create transaction with import batch ID
       const transaction = await db.createTransaction(
         payee.id,
         tx.date,
         tx.operationDate,
         tx.amount,
         tx.rawData,
-        tx.categoryId
+        tx.categoryId,
+        importBatchId
       );
       
       if (transaction.isDuplicate) {
@@ -212,6 +213,12 @@ app.post('/api/import', async (req, res) => {
       }
     });
     
+    // Check for potential duplicates within the same import batch
+    let potentialDuplicates = [];
+    if (importBatchId) {
+      potentialDuplicates = await db.getPotentialDuplicates(importBatchId);
+    }
+    
     res.json({
       success: true,
       importedPayees,
@@ -221,7 +228,14 @@ app.post('/api/import', async (req, res) => {
       transactions: importedTransactions,
       autoCategorized: autoCategorized.filter(ac =>
         importedTransactions.some(it => it.payee_id === ac.payee_id)
-      )
+      ),
+      potentialDuplicates: potentialDuplicates.map(pd => ({
+        id: pd.id,
+        payee: pd.payee_name,
+        date: pd.booking_date,
+        amount: pd.amount
+      })),
+      importBatchId
     });
   } catch (error) {
     console.error('Import error:', error);

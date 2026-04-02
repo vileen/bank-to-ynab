@@ -147,13 +147,14 @@ async function findPayeesByKeyword(keyword) {
 
 // === Transactions ===
 
-async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null) {
-  // Check for duplicate transaction
-  // Same payee + date + amount (raw_data removed - it contained row ID which varies between exports)
+async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null, importBatchId = null) {
+  // Check for duplicate transaction from DIFFERENT import batch
+  // Same payee + date + amount, but only if from different batch (or no batch)
   const checkResult = await pool.query(
     `SELECT * FROM transactions
-     WHERE payee_id = $1 AND booking_date = $2 AND amount = $3`,
-    [payeeId, bookingDate, amount]
+     WHERE payee_id = $1 AND booking_date = $2 AND amount = $3
+     AND (import_batch_id IS NULL OR import_batch_id != $4)`,
+    [payeeId, bookingDate, amount, importBatchId]
   );
 
   if (checkResult.rows.length > 0) {
@@ -163,12 +164,38 @@ async function createTransaction(payeeId, bookingDate, operationDate, amount, ra
   
   const result = await pool.query(
     `INSERT INTO transactions 
-     (payee_id, booking_date, operation_date, amount, raw_data, category_id) 
-     VALUES ($1, $2, $3, $4, $5, $6) 
+     (payee_id, booking_date, operation_date, amount, raw_data, category_id, import_batch_id) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7) 
      RETURNING *`,
-    [payeeId, bookingDate, operationDate, amount, JSON.stringify(rawData), categoryId]
+    [payeeId, bookingDate, operationDate, amount, JSON.stringify(rawData), categoryId, importBatchId]
   );
   return { ...result.rows[0], isDuplicate: false };
+}
+
+async function getPotentialDuplicates(importBatchId) {
+  // Find transactions with same payee+date+amount within the same import batch
+  // These are "potential duplicates" - same data but from same file (likely legitimate separate transactions)
+  const result = await pool.query(
+    `SELECT t1.*, p.name as payee_name
+     FROM transactions t1
+     JOIN transactions t2 ON t1.payee_id = t2.payee_id 
+       AND t1.booking_date = t2.booking_date 
+       AND t1.amount = t2.amount
+       AND t1.id != t2.id
+     JOIN payees p ON p.id = t1.payee_id
+     WHERE t1.import_batch_id = $1
+     ORDER BY t1.booking_date DESC, p.name`,
+    [importBatchId]
+  );
+  
+  // Remove duplicates from the result (since join produces pairs)
+  const seen = new Set();
+  return result.rows.filter(row => {
+    const key = `${row.payee_id}-${row.booking_date}-${row.amount}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function getRecentTransactions(limit = 100) {
@@ -304,5 +331,6 @@ module.exports = {
   getTransactionsWithCategories,
   getUnexportedTransactions,
   markTransactionsExported,
-  getLastExportedTransactionDate
+  getLastExportedTransactionDate,
+  getPotentialDuplicates
 };
