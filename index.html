@@ -1170,8 +1170,8 @@
                 const payee = allPayees.find(p => p.id === payeeId);
                 if (!payee) return;
                 
-                // Create new mapping
-                const keyword = payee.normalized_name?.split(' ')[0] || payee.name.split(' ')[0];
+                // Create new mapping from first 2 words to avoid overly broad 2-char keywords
+                const keyword = payee.normalized_name?.split(' ').filter(w => w.length > 0).slice(0, 2).join(' ') || payee.name.split(' ').filter(w => w.length > 0).slice(0, 2).join(' ');
                 const mappingResult = await apiPost('/mappings', {
                     keyword: keyword,
                     ynabCategoryId: categoryId,
@@ -1291,16 +1291,15 @@
 
                 // Parse amount, preserving sign
                 const amount = parseAmount(amountStr);
-                const date = parseDate(bookingDate);
-
-                if (isNaN(amount) || !date) continue;
-
                 const operationDateStr = cols[1]?.trim();
                 const operationDate = operationDateStr ? parseDate(operationDateStr) : null;
+                const bookingDateParsed = parseDate(bookingDate);
+
+                if (isNaN(amount) || !bookingDateParsed) continue;
 
                 transactions.push({
-                    date: date,
-                    operationDate: operationDate ? operationDate : null,
+                    date: operationDate || bookingDateParsed,
+                    operationDate: bookingDateParsed,
                     payee: payee,
                     amount: amount,
                     rawData: { cols }
@@ -1464,8 +1463,8 @@
                 const payee = unmappedPayees.find(p => p.id === payeeId);
                 if (!payee) return;
                 
-                // Extract keyword from payee name (simplified)
-                const keyword = payee.normalized_name.split(' ')[0];
+                // Extract keyword from payee name (use first 2 words to avoid overly broad matches)
+                const keyword = payee.normalized_name.split(' ').filter(w => w.length > 0).slice(0, 2).join(' ');
                 
                 await apiPost('/mappings', {
                     keyword: keyword,
