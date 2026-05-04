@@ -1298,8 +1298,8 @@
                 if (isNaN(amount) || !bookingDateParsed) continue;
 
                 transactions.push({
-                    date: operationDate || bookingDateParsed,
-                    operationDate: bookingDateParsed,
+                    date: bookingDateParsed,
+                    operationDate: operationDate,
                     payee: payee,
                     amount: amount,
                     rawData: { cols }
@@ -1627,6 +1627,11 @@
 
         function formatDate(dateStr) {
             if (!dateStr) return '';
+            // Handle YYYY-MM-DD directly to avoid timezone issues
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                const [year, month, day] = dateStr.split('-');
+                return `${day}.${month}.${year}`;
+            }
             const date = new Date(dateStr);
             if (isNaN(date.getTime())) return dateStr;
             return date.toLocaleDateString('pl-PL', {
