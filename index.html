@@ -542,6 +542,10 @@
         .duplicate-row {
             background: rgba(231, 76, 60, 0.08);
         }
+        .duplicate-row .tx-checkbox:not(:checked) + td,
+        .duplicate-row .tx-checkbox:not(:checked) ~ td {
+            opacity: 0.6;
+        }
         .duplicate-badge {
             display: inline-block;
             background: #e74c3c;
@@ -551,6 +555,18 @@
             border-radius: 12px;
             margin-left: 8px;
             font-weight: 600;
+        }
+        .tx-checkbox {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: #e94560;
+        }
+        #headerCheckbox {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: #e94560;
         }
     </style>
 </head>
@@ -675,6 +691,10 @@
                 <div class="section-header">
                     <h3>📋 Transakcje do eksportu</h3>
                     <div style="display: flex; align-items: center; gap: 15px;">
+                        <label style="display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer;">
+                            <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()" checked>
+                            <span id="selectedCount">0</span> zaznaczonych
+                        </label>
                         <span id="lastExportDate" style="color: #e94560; font-size: 13px; font-weight: 500;"></span>
                         <button class="btn" onclick="exportToYNAB()" id="exportBtn" disabled>
                             📥 Eksportuj do YNAB
@@ -684,6 +704,7 @@
                 <table>
                     <thead>
                         <tr>
+                            <th style="width: 40px;"><input type="checkbox" id="headerCheckbox" onchange="toggleSelectAll()"></th>
                             <th>Data</th>
                             <th>Payee</th>
                             <th>Kwota</th>
@@ -792,6 +813,7 @@
         let ynabCategories = [];
         let ynabAccounts = [];
         let allTransactions = [];
+        let selectedTransactions = new Set();
         let unmappedPayees = [];
         let mappedPayees = [];
         let currentImportBatchId = null;
@@ -1599,12 +1621,20 @@
                     has_duplicate: tx.has_duplicate
                 }));
                 
+                // Initialize selection: check non-duplicates by default, uncheck duplicates
+                selectedTransactions.clear();
+                allTransactions.forEach(tx => {
+                    if (!tx.has_duplicate) {
+                        selectedTransactions.add(tx.id);
+                    }
+                });
+                
                 document.getElementById('transactionsArea').classList.remove('hidden');
                 renderTransactionsTable();
                 await updateLastExportLabel();
                 
                 const accountId = document.getElementById('accountSelect').value;
-                document.getElementById('exportBtn').disabled = !accountId || allTransactions.length === 0;
+                updateExportButton();
             } catch (err) {
                 console.error('Failed to load transactions:', err);
             }
@@ -1677,6 +1707,13 @@
             tbody.innerHTML = allTransactions.map((tx, index) => `
                 <tr data-tx-index="${index}" class="${tx.has_duplicate ? 'duplicate-row' : ''}">
                     <td>
+                        <input type="checkbox" 
+                               class="tx-checkbox" 
+                               data-tx-id="${tx.id}"
+                               ${selectedTransactions.has(tx.id) ? 'checked' : ''}
+                               onchange="toggleTransactionSelection(${tx.id}, this.checked)">
+                    </td>
+                    <td>
                         ${formatDate(tx.date)}
                         ${tx.has_duplicate ? '<span class="duplicate-badge">⚠️ Duplikat</span>' : ''}
                     </td>
@@ -1707,15 +1744,73 @@
                     </td>
                 </tr>
             `).join('');
+            updateSelectedCount();
+            updateHeaderCheckbox();
+        }
+        
+        function toggleTransactionSelection(id, checked) {
+            if (checked) {
+                selectedTransactions.add(id);
+            } else {
+                selectedTransactions.delete(id);
+            }
+            updateSelectedCount();
+            updateHeaderCheckbox();
+            updateExportButton();
+        }
+        
+        function toggleSelectAll() {
+            const headerCb = document.getElementById('headerCheckbox');
+            const checked = headerCb.checked;
+            allTransactions.forEach(tx => {
+                if (checked) {
+                    selectedTransactions.add(tx.id);
+                } else {
+                    selectedTransactions.delete(tx.id);
+                }
+            });
+            renderTransactionsTable();
+            updateExportButton();
+        }
+        
+        function updateSelectedCount() {
+            const count = selectedTransactions.size;
+            document.getElementById('selectedCount').textContent = count;
+        }
+        
+        function updateHeaderCheckbox() {
+            const headerCb = document.getElementById('headerCheckbox');
+            const allCount = allTransactions.length;
+            const selectedCount = selectedTransactions.size;
+            if (allCount === 0) {
+                headerCb.checked = false;
+                headerCb.indeterminate = false;
+            } else if (selectedCount === allCount) {
+                headerCb.checked = true;
+                headerCb.indeterminate = false;
+            } else if (selectedCount === 0) {
+                headerCb.checked = false;
+                headerCb.indeterminate = false;
+            } else {
+                headerCb.checked = false;
+                headerCb.indeterminate = true;
+            }
+        }
+        
+        function updateExportButton() {
+            const accountId = document.getElementById('accountSelect').value;
+            const hasSelected = selectedTransactions.size > 0;
+            document.getElementById('exportBtn').disabled = !accountId || !hasSelected;
         }
         
         async function deleteTransactionById(id, index) {
             if (!confirm('Usunąć tę transakcję?')) return;
             try {
                 await apiDelete(`/transactions/${id}`);
+                selectedTransactions.delete(id);
                 allTransactions.splice(index, 1);
                 renderTransactionsTable();
-                document.getElementById('exportBtn').disabled = allTransactions.length === 0;
+                updateExportButton();
             } catch (err) {
                 alert('❌ Błąd usuwania: ' + (err.message || 'Unknown error'));
             }
@@ -1829,7 +1924,7 @@
             });
             
             // Enable/disable export button
-            document.getElementById('exportBtn').disabled = allTransactions.length === 0;
+            updateExportButton();
         }
 
         async function clearAllData() {
@@ -1855,12 +1950,18 @@
                 return;
             }
             
+            const transactionsToExport = allTransactions.filter(tx => selectedTransactions.has(tx.id));
+            if (transactionsToExport.length === 0) {
+                alert('Zaznacz co najmniej jedną transakcję do eksportu');
+                return;
+            }
+            
             const exportBtn = document.getElementById('exportBtn');
             exportBtn.disabled = true;
             exportBtn.textContent = '⏳ Eksportowanie...';
             
             try {
-                const ynabTransactions = allTransactions.map(tx => ({
+                const ynabTransactions = transactionsToExport.map(tx => ({
                     account_id: accountId,
                     date: tx.date,
                     amount: Math.round(tx.amount * 1000),
@@ -1875,23 +1976,24 @@
                 const imported = result.data.transactions?.length || 0;
                 const duplicated = result.data.duplicated_import_ids?.length || 0;
                 
-                // Mark transactions as exported in our DB
-                const transactionIds = allTransactions.map(tx => tx.id).filter(id => id);
+                // Mark only selected transactions as exported in our DB
+                const transactionIds = transactionsToExport.map(tx => tx.id).filter(id => id);
                 if (transactionIds.length > 0) {
                     await apiPost('/transactions/mark-exported', { transactionIds });
                 }
                 
                 // Save last export date
-                const lastExportDate = allTransactions.length > 0 
-                    ? allTransactions[0].date 
+                const lastExportDate = transactionsToExport.length > 0 
+                    ? transactionsToExport[0].date 
                     : new Date().toISOString().split('T')[0];
                 localStorage.setItem('bankToYnab_lastExportDate', lastExportDate);
                 await updateLastExportLabel();
                 
-                alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}`);
+                alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}\nZaznaczonych: ${transactionsToExport.length}`);
                 
                 // Clear transactions
                 allTransactions = [];
+                selectedTransactions.clear();
                 document.getElementById('transactionsArea').classList.add('hidden');
                 
             } catch (err) {
