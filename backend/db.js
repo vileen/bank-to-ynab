@@ -148,25 +148,18 @@ async function findPayeesByKeyword(keyword) {
 // === Transactions ===
 
 async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null, importBatchId = null) {
-  // Check for duplicate transaction from DIFFERENT import batch
-  // If found and NOT exported, remove the old one and insert the new one
-  // If found and already exported, skip (true duplicate)
+  // Check if this exact transaction already exists
   const checkResult = await pool.query(
     `SELECT * FROM transactions
      WHERE payee_id = $1 AND booking_date = $2 AND amount = $3
-     AND (import_batch_id IS NULL OR import_batch_id != $4)`,
+     AND (import_batch_id = $4 OR import_batch_id IS NULL)`,
     [payeeId, bookingDate, amount, importBatchId]
   );
 
   if (checkResult.rows.length > 0) {
     const existing = checkResult.rows[0];
-    // If already exported to YNAB, keep it and skip this one
-    if (existing.exported_to_ynab) {
-      return { ...existing, isDuplicate: true };
-    }
-    // Not exported yet: remove old unexported transaction and let new one replace it
-    await pool.query('DELETE FROM transactions WHERE id = $1', [existing.id]);
-    // Fall through to insert below
+    // Already exists — treat as duplicate
+    return { ...existing, isDuplicate: true };
   }
   
   const result = await pool.query(
