@@ -1341,7 +1341,7 @@
                     if (result.duplicates && result.duplicates.length > 0) {
                         duplicatesList.classList.remove('hidden');
                         duplicatesUl.innerHTML = result.duplicates.map(d =>
-                            `<li>${d.date} - ${d.payee} - ${d.amount.toFixed(2)} PLN</li>`
+                            `<li>${d.date} - ${d.payee} - ${parseFloat(d.amount).toFixed(2)} PLN</li>`
                         ).join('');
                     } else {
                         duplicatesList.classList.add('hidden');
@@ -1353,7 +1353,7 @@
                     if (result.potentialDuplicates && result.potentialDuplicates.length > 0) {
                         potentialDuplicatesList.classList.remove('hidden');
                         potentialDuplicatesUl.innerHTML = result.potentialDuplicates.map(d =>
-                            `<li>${d.date} - ${escapeHtml(d.payee)} - ${d.amount.toFixed(2)} PLN</li>`
+                            `<li>${d.date} - ${escapeHtml(d.payee)} - ${parseFloat(d.amount).toFixed(2)} PLN</li>`
                         ).join('');
                     } else {
                         potentialDuplicatesList.classList.add('hidden');
@@ -1564,7 +1564,7 @@
                 const data = await apiGet('/transactions/unexported');
                 allTransactions = data.transactions.map(tx => ({
                     id: tx.id,
-                    date: tx.booking_date,
+                    date: tx.operation_date || tx.booking_date,
                     payee: tx.payee_name,
                     amount: tx.amount,
                     category_id: tx.ynab_category_id || tx.category_id,
