@@ -233,7 +233,14 @@ async function clearOldTransactions(days = 30) {
 async function getUnexportedTransactions() {
   const result = await pool.query(`
     SELECT t.*, p.name as payee_name, p.normalized_name,
-           m.ynab_category_id, m.ynab_category_name
+           m.ynab_category_id, m.ynab_category_name,
+           EXISTS (
+             SELECT 1 FROM transactions t2 
+             WHERE t2.payee_id = t.payee_id 
+               AND t2.booking_date = t.booking_date 
+               AND t2.amount = t.amount 
+               AND t2.id != t.id
+           ) as has_duplicate
     FROM transactions t
     JOIN payees p ON p.id = t.payee_id
     LEFT JOIN mappings m ON m.id = p.mapping_id
@@ -319,6 +326,10 @@ async function getTransactionsWithCategories() {
   return result.rows;
 }
 
+async function deleteTransaction(id) {
+  await pool.query('DELETE FROM transactions WHERE id = $1', [id]);
+}
+
 module.exports = {
   pool,
   initDb,
@@ -340,5 +351,6 @@ module.exports = {
   getUnexportedTransactions,
   markTransactionsExported,
   getLastExportedTransactionDate,
-  getPotentialDuplicates
+  getPotentialDuplicates,
+  deleteTransaction
 };

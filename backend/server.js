@@ -136,6 +136,17 @@ app.post('/api/budgets/:budgetId/transactions', async (req, res) => {
   }
 });
 
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await db.deleteTransaction(id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete transaction error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // === Import & Payees ===
 
 // Import transactions from CSV
@@ -232,7 +243,7 @@ app.post('/api/import', async (req, res) => {
       potentialDuplicates: potentialDuplicates.map(pd => ({
         id: pd.id,
         payee: pd.payee_name,
-        date: pd.booking_date,
+        date: pd.operation_date || pd.booking_date,
         amount: pd.amount
       })),
       importBatchId

@@ -527,6 +527,31 @@
         .auth-btn:hover {
             opacity: 0.9;
         }
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .duplicate-row {
+            background: rgba(231, 76, 60, 0.08);
+        }
+        .duplicate-badge {
+            display: inline-block;
+            background: #e74c3c;
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -663,6 +688,7 @@
                             <th>Payee</th>
                             <th>Kwota</th>
                             <th>Kategoria YNAB</th>
+                            <th>Akcje</th>
                         </tr>
                     </thead>
                     <tbody id="transactionsTable"></tbody>
@@ -1569,7 +1595,8 @@
                     amount: tx.amount,
                     category_id: tx.ynab_category_id || tx.category_id,
                     category_name: tx.ynab_category_name || 'Uncategorized',
-                    raw_data: tx.raw_data
+                    raw_data: tx.raw_data,
+                    has_duplicate: tx.has_duplicate
                 }));
                 
                 document.getElementById('transactionsArea').classList.remove('hidden');
@@ -1644,8 +1671,11 @@
         function renderTransactionsTable() {
             const tbody = document.getElementById('transactionsTable');
             tbody.innerHTML = allTransactions.map((tx, index) => `
-                <tr data-tx-index="${index}">
-                    <td>${formatDate(tx.date)}</td>
+                <tr data-tx-index="${index}" class="${tx.has_duplicate ? 'duplicate-row' : ''}">
+                    <td>
+                        ${formatDate(tx.date)}
+                        ${tx.has_duplicate ? '<span class="duplicate-badge">⚠️ Duplikat</span>' : ''}
+                    </td>
                     <td>${escapeHtml(tx.payee)}</td>
                     <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${parseFloat(tx.amount).toFixed(2)}</td>
                     <td>
@@ -1666,8 +1696,25 @@
                             </div>
                         </div>
                     </td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteTransactionById(${tx.id}, ${index})" title="Usuń transakcję">
+                            🗑️
+                        </button>
+                    </td>
                 </tr>
             `).join('');
+        }
+        
+        async function deleteTransactionById(id, index) {
+            if (!confirm('Usunąć tę transakcję?')) return;
+            try {
+                await apiDelete(`/transactions/${id}`);
+                allTransactions.splice(index, 1);
+                renderTransactionsTable();
+                document.getElementById('exportBtn').disabled = allTransactions.length === 0;
+            } catch (err) {
+                alert('❌ Błąd usuwania: ' + (err.message || 'Unknown error'));
+            }
         }
         
         // === Transaction Category Dropdown Functions ===
