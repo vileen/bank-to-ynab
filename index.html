@@ -1367,7 +1367,7 @@
                     if (result.duplicates && result.duplicates.length > 0) {
                         duplicatesList.classList.remove('hidden');
                         duplicatesUl.innerHTML = result.duplicates.map(d =>
-                            `<li>${d.date} - ${d.payee} - ${parseFloat(d.amount).toFixed(2)} PLN</li>`
+                            `<li>${formatDate(d.date)} - ${d.payee} - ${parseFloat(d.amount).toFixed(2)} PLN</li>`
                         ).join('');
                     } else {
                         duplicatesList.classList.add('hidden');
@@ -1379,7 +1379,7 @@
                     if (result.potentialDuplicates && result.potentialDuplicates.length > 0) {
                         potentialDuplicatesList.classList.remove('hidden');
                         potentialDuplicatesUl.innerHTML = result.potentialDuplicates.map(d =>
-                            `<li>${d.date} - ${escapeHtml(d.payee)} - ${parseFloat(d.amount).toFixed(2)} PLN</li>`
+                            `<li>${formatDate(d.date)} - ${escapeHtml(d.payee)} - ${parseFloat(d.amount).toFixed(2)} PLN</li>`
                         ).join('');
                     } else {
                         potentialDuplicatesList.classList.add('hidden');
@@ -1654,6 +1654,10 @@
 
         function formatDate(dateStr) {
             if (!dateStr) return '';
+            // Handle ISO format like 2026-05-07T22:00:00.000Z — extract YYYY-MM-DD
+            if (dateStr.includes('T')) {
+                dateStr = dateStr.split('T')[0];
+            }
             // Handle YYYY-MM-DD directly to avoid timezone issues
             if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
                 const [year, month, day] = dateStr.split('-');
