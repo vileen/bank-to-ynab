@@ -1,5 +1,9 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
 const path = require('path');
+
+// Fix: pg by default parses DATE as local-time Date, which shifts dates by timezone offset.
+// Return raw string (YYYY-MM-DD) to avoid timezone issues.
+types.setTypeParser(1082, val => val);
 
 // Database configuration - uses same setup as speech-practice
 const pool = new Pool({
