@@ -1412,6 +1412,7 @@
                 // Reload data
                 await loadPayees();
                 await loadUnexportedTransactions();
+                applyMappingsToScreenshotTransactions();
                 
             } catch (err) {
                 alert('Błąd aktualizacji kategorii: ' + err.message);
@@ -1699,6 +1700,7 @@
                 // Reload payees and transactions (to reflect new category mapping)
                 await loadPayees();
                 await loadUnexportedTransactions();
+                applyMappingsToScreenshotTransactions();
                 
             } catch (err) {
                 alert('Błąd przypisywania kategorii: ' + err.message);
@@ -1763,6 +1765,7 @@
                 await loadMappings();
                 await loadPayees();
                 await loadUnexportedTransactions();
+                applyMappingsToScreenshotTransactions();
                 
             } catch (err) {
                 alert('Błąd zapisywania mapowania: ' + err.message);
@@ -1777,6 +1780,7 @@
                 await loadMappings();
                 await loadPayees();
                 await loadUnexportedTransactions();
+                applyMappingsToScreenshotTransactions();
             } catch (err) {
                 alert('Błąd usuwania mapowania: ' + err.message);
             }
@@ -2000,13 +2004,6 @@
         // === Transaction Category Dropdown Functions ===
         function toggleTxDropdown(index) {
             const dropdown = document.getElementById(`tx-dropdown-${index}`);
-            if (!dropdown) return;
-            
-            // Ensure dropdown is populated before opening
-            if (dropdown.children.length === 0 && ynabCategories.length > 0) {
-                populateSearchableCategoryDropdowns();
-            }
-            
             // Close all other tx dropdowns
             document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
                 if (dd.id !== `tx-dropdown-${index}`) {
@@ -2349,13 +2346,6 @@
         // === Screenshot Category Dropdown Functions ===
         function toggleScreenshotCategoryDropdown(index) {
             const dropdown = document.getElementById(`screenshot-category-dropdown-${index}`);
-            if (!dropdown) return;
-            
-            // Ensure dropdown is populated before opening
-            if (dropdown.children.length === 0 && ynabCategories.length > 0) {
-                populateSearchableCategoryDropdowns();
-            }
-            
             document.querySelectorAll('#screenshotReviewTable .searchable-select-dropdown').forEach(dd => {
                 if (dd.id !== `screenshot-category-dropdown-${index}`) {
                     dd.classList.remove('active');
@@ -2394,6 +2384,25 @@
             }
             
             document.getElementById(`screenshot-category-dropdown-${index}`).classList.remove('active');
+            updateScreenshotStats();
+        }
+        
+        function applyMappingsToScreenshotTransactions() {
+            if (screenshotTransactions.length === 0 || mappings.length === 0) return;
+            
+            screenshotTransactions.forEach(tx => {
+                const payeeName = (tx.payee || '').toLowerCase();
+                for (const mapping of mappings) {
+                    const keyword = (mapping.keyword || '').toLowerCase();
+                    if (keyword && payeeName.includes(keyword)) {
+                        tx.categoryId = mapping.ynab_category_id;
+                        tx.categoryName = mapping.ynab_category_name;
+                        break;
+                    }
+                }
+            });
+            
+            renderScreenshotReviewTable();
             updateScreenshotStats();
         }
         
