@@ -2423,33 +2423,54 @@
         }
 
         async function loadPendingScreenshotSession() {
-            const sessionId = localStorage.getItem(SCREENSHOT_SESSION_KEY);
-            if (!sessionId) return;
-
-            try {
-                const result = await apiGet(`/import/screenshots/${sessionId}`);
-                if (result.success && result.data) {
-                    screenshotTransactions = result.data.transactions || [];
-                    currentScreenshotImportBatchId = result.data.importBatchId || result.importBatchId;
-                    currentScreenshotSessionId = result.sessionId;
-
-                    renderScreenshotReviewTable();
-                    updateScreenshotStats();
-                    updateScreenshotSessionInfo();
-
-                    document.getElementById('screenshotReviewArea').classList.remove('hidden');
-
-                    // Przywróć podgląd (nie mamy już plików, więc tylko informacja)
-                    const preview = document.getElementById('screenshotPreview');
-                    preview.innerHTML = `<div style="color: #888; font-size: 13px;">Przywrócono sesję z ${screenshotTransactions.length} transakcjami</div>`;
-                    preview.classList.remove('hidden');
-                } else {
+            let sessionId = localStorage.getItem(SCREENSHOT_SESSION_KEY);
+            let result = null;
+            
+            if (sessionId) {
+                try {
+                    result = await apiGet(`/import/screenshots/${sessionId}`);
+                    if (!result.success || !result.data) {
+                        result = null;
+                        localStorage.removeItem(SCREENSHOT_SESSION_KEY);
+                    }
+                } catch (err) {
+                    console.error('Failed to load stored screenshot session:', err);
+                    result = null;
                     localStorage.removeItem(SCREENSHOT_SESSION_KEY);
                 }
-            } catch (err) {
-                console.error('Failed to load pending screenshot session:', err);
-                localStorage.removeItem(SCREENSHOT_SESSION_KEY);
             }
+            
+            if (!result) {
+                try {
+                    result = await apiGet('/import/screenshots');
+                    if (result.success && result.sessionId) {
+                        sessionId = result.sessionId;
+                        localStorage.setItem(SCREENSHOT_SESSION_KEY, sessionId);
+                    }
+                } catch (err) {
+                    console.log('No pending screenshot sessions found');
+                    return;
+                }
+            }
+            
+            if (!result || !result.success || !result.data) {
+                return;
+            }
+            
+            screenshotTransactions = result.data.transactions || [];
+            currentScreenshotImportBatchId = result.data.importBatchId || result.importBatchId;
+            currentScreenshotSessionId = result.sessionId;
+
+            renderScreenshotReviewTable();
+            updateScreenshotStats();
+            updateScreenshotSessionInfo();
+
+            document.getElementById('screenshotReviewArea').classList.remove('hidden');
+
+            // Przywróć podgląd (nie mamy już plików, więc tylko informacja)
+            const preview = document.getElementById('screenshotPreview');
+            preview.innerHTML = `<div style="color: #888; font-size: 13px;">Przywrócono sesję z ${screenshotTransactions.length} transakcjami</div>`;
+            preview.classList.remove('hidden');
         }
 
         async function clearScreenshotSession() {

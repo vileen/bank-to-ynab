@@ -156,6 +156,29 @@ function normalizePayeeName(name) {
 }
 
 /**
+ * GET /api/import/screenshots
+ * Zwraca najnowszą aktywną sesję review.
+ */
+router.get('/', async (req, res) => {
+  try {
+    const sessions = await db.getPendingScreenshotSessions(1);
+    if (!sessions || sessions.length === 0) {
+      return res.status(404).json({ error: 'No pending screenshot sessions' });
+    }
+    const session = sessions[0];
+    res.json({
+      success: true,
+      sessionId: session.session_id,
+      importBatchId: session.import_batch_id,
+      data: session.data
+    });
+  } catch (error) {
+    console.error('Latest screenshot session error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * GET /api/import/screenshots/:sessionId
  * Pobiera zapisaną sesję review ze zrzutów ekranu.
  */
