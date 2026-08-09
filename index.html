@@ -1249,6 +1249,20 @@
                     dd.classList.remove('active');
                 }
             });
+            
+            // Close transaction dropdowns
+            document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
+                if (!dd.parentElement.contains(e.target)) {
+                    dd.classList.remove('active');
+                }
+            });
+            
+            // Close screenshot review dropdowns
+            document.querySelectorAll('#screenshotReviewTable .searchable-select-dropdown').forEach(dd => {
+                if (!dd.parentElement.contains(e.target)) {
+                    dd.classList.remove('active');
+                }
+            });
         });
         
         // === Payee Category Dropdown Functions ===
@@ -1834,14 +1848,22 @@
                     <td>${escapeHtml(tx.payee)}</td>
                     <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${parseFloat(tx.amount).toFixed(2)}</td>
                     <td>
-                        <select class="category-select" style="min-width: 200px;" onchange="changeTxCategory(${index}, this.value)">
-                            <option value="" ${!tx.category_id ? 'selected' : ''}>-- Wybierz kategorię --</option>
-                            ${ynabCategories.map(cat => `
-                                <option value="${cat.id}" ${cat.id === tx.category_id ? 'selected' : ''}>
-                                    ${escapeHtml(cat.name)}
-                                </option>
-                            `).join('')}
-                        </select>
+                        <div class="searchable-select tx-category-select" style="min-width: 200px;">
+                            <input type="text" class="searchable-select-input" 
+                                   value="${escapeHtml(tx.category_name === 'Uncategorized' ? '' : tx.category_name)}"
+                                   placeholder="Wybierz kategorię..."
+                                   onclick="toggleTxDropdown(${index})" 
+                                   oninput="filterTxCategories(${index}, this.value)">
+                            <div class="searchable-select-dropdown" id="tx-dropdown-${index}">
+                                ${ynabCategories.map(cat => `
+                                    <div class="searchable-select-item ${cat.id === tx.category_id ? 'selected' : ''}" 
+                                         data-value="${cat.id}" 
+                                         onclick="selectTxCategory(${index}, this.dataset.value, this.textContent)">
+                                        ${escapeHtml(cat.name)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
                     </td>
                     <td>
                         <button class="btn btn-danger" onclick="deleteTransactionById(${tx.id}, ${index})" title="Usuń transakcję">
@@ -1922,11 +1944,51 @@
             }
         }
         
-        // === Transaction Category Select Function ===
-        function changeTxCategory(index, categoryId) {
-            const category = ynabCategories.find(c => c.id === categoryId);
+        // === Transaction Category Dropdown Functions ===
+        function toggleTxDropdown(index) {
+            const dropdown = document.getElementById(`tx-dropdown-${index}`);
+            // Close all other tx dropdowns
+            document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
+                if (dd.id !== `tx-dropdown-${index}`) {
+                    dd.classList.remove('active');
+                }
+            });
+            dropdown.classList.toggle('active');
+        }
+        
+        function filterTxCategories(index, searchTerm) {
+            const dropdown = document.getElementById(`tx-dropdown-${index}`);
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            let hasResults = false;
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(searchTerm.toLowerCase())) {
+                    item.style.display = 'block';
+                    hasResults = true;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            dropdown.classList.add('active');
+        }
+        
+        function selectTxCategory(index, categoryId, categoryName) {
             allTransactions[index].category_id = categoryId;
-            allTransactions[index].category_name = category ? category.name : 'Uncategorized';
+            allTransactions[index].category_name = categoryName || 'Uncategorized';
+            
+            const row = document.querySelector(`tr[data-tx-index="${index}"]`);
+            if (row) {
+                const input = row.querySelector('.searchable-select-input');
+                if (input) input.value = categoryName || '';
+                
+                row.querySelectorAll('.searchable-select-item').forEach(item => {
+                    item.classList.toggle('selected', item.dataset.value === categoryId);
+                });
+            }
+            
+            document.getElementById(`tx-dropdown-${index}`).classList.remove('active');
         }
         
         // === Account Dropdown Functions ===
@@ -2169,12 +2231,22 @@
                     <td><input type="text" class="screenshot-edit-input" value="${escapeHtml(tx.usdgRaw || tx.usdgAmount || '')}" onchange="updateScreenshotTransactionField(${index}, 'usdgRaw', this.value)"></td>
                     <td class="${confidenceClass(tx.confidence)}">${Math.round((tx.confidence || 0) * 100)}%</td>
                     <td>
-                        <select class="screenshot-edit-select category-select" onchange="updateScreenshotTransactionField(${index}, 'categoryId', this.value)">
-                            <option value="">-- Wybierz --</option>
-                            ${ynabCategories.map(cat => `
-                                <option value="${cat.id}" ${tx.categoryId === cat.id ? 'selected' : ''}>${escapeHtml(cat.name)}</option>
-                            `).join('')}
-                        </select>
+                        <div class="searchable-select screenshot-category-select" style="min-width: 200px;">
+                            <input type="text" class="searchable-select-input" 
+                                   value="${escapeHtml(tx.categoryName || '')}"
+                                   placeholder="Wybierz kategorię..."
+                                   onclick="toggleScreenshotCategoryDropdown(${index})" 
+                                   oninput="filterScreenshotCategories(${index}, this.value)">
+                            <div class="searchable-select-dropdown" id="screenshot-category-dropdown-${index}">
+                                ${ynabCategories.map(cat => `
+                                    <div class="searchable-select-item ${cat.id === tx.categoryId ? 'selected' : ''}" 
+                                         data-value="${cat.id}" 
+                                         onclick="selectScreenshotCategory(${index}, this.dataset.value, this.textContent)">
+                                        ${escapeHtml(cat.name)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
                     </td>
                     <td>
                         <button class="btn btn-danger" onclick="deleteScreenshotTransaction(${index})" title="Usuń transakcję">
@@ -2204,7 +2276,51 @@
 
             updateScreenshotStats();
         }
-
+        
+        // === Screenshot Category Dropdown Functions ===
+        function toggleScreenshotCategoryDropdown(index) {
+            const dropdown = document.getElementById(`screenshot-category-dropdown-${index}`);
+            document.querySelectorAll('#screenshotReviewTable .searchable-select-dropdown').forEach(dd => {
+                if (dd.id !== `screenshot-category-dropdown-${index}`) {
+                    dd.classList.remove('active');
+                }
+            });
+            dropdown.classList.toggle('active');
+        }
+        
+        function filterScreenshotCategories(index, searchTerm) {
+            const dropdown = document.getElementById(`screenshot-category-dropdown-${index}`);
+            const items = dropdown.querySelectorAll('.searchable-select-item');
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm.toLowerCase()) ? 'block' : 'none';
+            });
+            
+            dropdown.classList.add('active');
+        }
+        
+        function selectScreenshotCategory(index, categoryId, categoryName) {
+            const tx = screenshotTransactions[index];
+            if (!tx) return;
+            
+            tx.categoryId = categoryId || null;
+            tx.categoryName = categoryName || '';
+            
+            const row = document.querySelector(`tr[data-screenshot-index="${index}"]`);
+            if (row) {
+                const input = row.querySelector('.searchable-select-input');
+                if (input) input.value = categoryName || '';
+                
+                row.querySelectorAll('.searchable-select-item').forEach(item => {
+                    item.classList.toggle('selected', item.dataset.value === categoryId);
+                });
+            }
+            
+            document.getElementById(`screenshot-category-dropdown-${index}`).classList.remove('active');
+            updateScreenshotStats();
+        }
+        
         function deleteScreenshotTransaction(index) {
             if (!confirm('Usunąć tę transakcję z importu?')) return;
             screenshotTransactions.splice(index, 1);
