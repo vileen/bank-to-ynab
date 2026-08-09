@@ -2000,6 +2000,13 @@
         // === Transaction Category Dropdown Functions ===
         function toggleTxDropdown(index) {
             const dropdown = document.getElementById(`tx-dropdown-${index}`);
+            if (!dropdown) return;
+            
+            // Ensure dropdown is populated before opening
+            if (dropdown.children.length === 0 && ynabCategories.length > 0) {
+                populateSearchableCategoryDropdowns();
+            }
+            
             // Close all other tx dropdowns
             document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
                 if (dd.id !== `tx-dropdown-${index}`) {
@@ -2342,6 +2349,13 @@
         // === Screenshot Category Dropdown Functions ===
         function toggleScreenshotCategoryDropdown(index) {
             const dropdown = document.getElementById(`screenshot-category-dropdown-${index}`);
+            if (!dropdown) return;
+            
+            // Ensure dropdown is populated before opening
+            if (dropdown.children.length === 0 && ynabCategories.length > 0) {
+                populateSearchableCategoryDropdowns();
+            }
+            
             document.querySelectorAll('#screenshotReviewTable .searchable-select-dropdown').forEach(dd => {
                 if (dd.id !== `screenshot-category-dropdown-${index}`) {
                     dd.classList.remove('active');
