@@ -367,8 +367,8 @@ app.get('/api/transactions/unexported', async (req, res) => {
 // Mark transactions as exported
 app.post('/api/transactions/mark-exported', async (req, res) => {
   try {
-    const { transactionIds } = req.body;
-    const updated = await db.markTransactionsExported(transactionIds);
+    const { transactionIds, accountId } = req.body;
+    const updated = await db.markTransactionsExported(transactionIds, accountId);
     res.json({ success: true, count: updated.length });
   } catch (error) {
     console.error('Database error:', error);
@@ -379,7 +379,8 @@ app.post('/api/transactions/mark-exported', async (req, res) => {
 // Get last exported transaction date
 app.get('/api/transactions/last-exported', async (req, res) => {
   try {
-    const lastExportDate = await db.getLastExportedTransactionDate();
+    const { accountId } = req.query;
+    const lastExportDate = await db.getLastExportedTransactionDate(accountId);
     res.json({ lastExportDate });
   } catch (error) {
     console.error('Database error:', error);

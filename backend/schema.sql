@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS transactions (
     exported_to_ynab BOOLEAN DEFAULT FALSE
 );
 
+-- Track which YNAB account each transaction was exported to
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS exported_ynab_account_id VARCHAR(255);
+CREATE INDEX IF NOT EXISTS idx_transactions_exported_account ON transactions(exported_ynab_account_id);
+
 -- Add source_type and original currency columns for screenshot imports
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS source_type VARCHAR(50) DEFAULT 'csv';
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS original_amount DECIMAL(12, 2);

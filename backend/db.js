@@ -41,6 +41,16 @@ async function initDb() {
       ON screenshot_review_sessions(status)
     `);
 
+    // Track YNAB account per exported transaction
+    await client.query(`
+      ALTER TABLE transactions
+      ADD COLUMN IF NOT EXISTS exported_ynab_account_id VARCHAR(255)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_transactions_exported_account
+      ON transactions(exported_ynab_account_id)
+    `);
+
     client.release();
   } catch (err) {
     console.error('❌ Database connection failed:', err.message);
@@ -386,23 +396,30 @@ async function getUnexportedTransactions() {
   return result.rows;
 }
 
-async function markTransactionsExported(transactionIds) {
+async function markTransactionsExported(transactionIds, accountId) {
   const result = await pool.query(
     `UPDATE transactions
-     SET exported_to_ynab = TRUE
+     SET exported_to_ynab = TRUE,
+         exported_ynab_account_id = $2
      WHERE id = ANY($1::int[])
      RETURNING *`,
-    [transactionIds]
+    [transactionIds, accountId || null]
   );
   return result.rows;
 }
 
-async function getLastExportedTransactionDate() {
-  const result = await pool.query(`
+async function getLastExportedTransactionDate(accountId) {
+  let query = `
     SELECT MAX(booking_date) as last_export_date
     FROM transactions
     WHERE exported_to_ynab = TRUE
-  `);
+  `;
+  const params = [];
+  if (accountId) {
+    query += ' AND exported_ynab_account_id = $1';
+    params.push(accountId);
+  }
+  const result = await pool.query(query, params);
   return result.rows[0]?.last_export_date || null;
 }
 

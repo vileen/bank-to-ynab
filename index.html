@@ -1787,19 +1787,24 @@
             const label = document.getElementById('lastExportDate');
             const mainLabel = document.getElementById('lastExportDateMain');
             const card = document.getElementById('lastExportCard');
+            const accountId = document.getElementById('accountSelect').value;
             
             let exportDate = null;
+            const storageKey = accountId 
+                ? `bankToYnab_lastExportDate_${accountId}` 
+                : 'bankToYnab_lastExportDate';
             
             try {
-                // Fetch last export date from backend
-                const data = await apiGet('/transactions/last-exported');
+                // Fetch last export date from backend per account
+                const query = accountId ? `?accountId=${encodeURIComponent(accountId)}` : '';
+                const data = await apiGet(`/transactions/last-exported${query}`);
                 if (data.lastExportDate) {
                     exportDate = data.lastExportDate;
-                    localStorage.setItem('bankToYnab_lastExportDate', exportDate);
+                    localStorage.setItem(storageKey, exportDate);
                 }
             } catch (err) {
                 // Fall back to localStorage on error
-                exportDate = localStorage.getItem('bankToYnab_lastExportDate');
+                exportDate = localStorage.getItem(storageKey);
             }
             
             const displayDate = exportDate ? formatDate(exportDate) : null;
@@ -2068,6 +2073,9 @@
             
             // Enable/disable export button
             updateExportButton();
+            
+            // Refresh last export date for selected account
+            updateLastExportLabel();
         }
 
         async function clearAllData() {
@@ -2122,14 +2130,14 @@
                 // Mark only selected transactions as exported in our DB
                 const transactionIds = transactionsToExport.map(tx => tx.id).filter(id => id);
                 if (transactionIds.length > 0) {
-                    await apiPost('/transactions/mark-exported', { transactionIds });
+                    await apiPost('/transactions/mark-exported', { transactionIds, accountId });
                 }
                 
-                // Save last export date
+                // Save last export date per account
                 const lastExportDate = transactionsToExport.length > 0 
                     ? transactionsToExport[0].date 
                     : new Date().toISOString().split('T')[0];
-                localStorage.setItem('bankToYnab_lastExportDate', lastExportDate);
+                localStorage.setItem(`bankToYnab_lastExportDate_${accountId}`, lastExportDate);
                 await updateLastExportLabel();
                 
                 alert(`✅ Eksport zakończony!\nZaimportowano: ${imported}\nDuplikaty pominięte: ${duplicated}\nZaznaczonych: ${transactionsToExport.length}`);
