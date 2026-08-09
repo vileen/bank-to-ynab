@@ -1160,6 +1160,14 @@
             
             // Update searchable dropdown for mapping
             renderCategoryDropdown(ynabCategories);
+            
+            // Re-render tables so searchable category dropdowns get populated
+            if (allTransactions.length > 0) {
+                renderTransactionsTable();
+            }
+            if (screenshotTransactions.length > 0) {
+                renderScreenshotReviewTable();
+            }
         }
         
         // === Searchable Dropdown Functions ===
