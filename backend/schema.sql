@@ -36,6 +36,12 @@ CREATE TABLE IF NOT EXISTS transactions (
     exported_to_ynab BOOLEAN DEFAULT FALSE
 );
 
+-- Add source_type and original currency columns for screenshot imports
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS source_type VARCHAR(50) DEFAULT 'csv';
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS original_amount DECIMAL(12, 2);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS original_currency VARCHAR(3);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS pln_equivalent DECIMAL(12, 2);
+
 -- Add import_batch_id column to transactions (for tracking CSV import batches)
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS import_batch_id VARCHAR(255);
 CREATE INDEX IF NOT EXISTS idx_transactions_import_batch ON transactions(import_batch_id);

@@ -4,6 +4,7 @@ const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
 const db = require('./db');
+const screenshotsRoutes = require('./routes/screenshots');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -60,6 +61,9 @@ app.use('/api', (req, res, next) => {
   }
   requireAuth(req, res, next);
 });
+
+// Screenshot import routes (mounted under /api/import/screenshots)
+app.use('/api/import/screenshots', screenshotsRoutes);
 
 // Helper: YNAB API client
 const ynabApi = axios.create({

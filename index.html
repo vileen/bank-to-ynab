@@ -568,6 +568,41 @@
             height: 18px;
             accent-color: #e94560;
         }
+
+        /* Screenshot review table inline editing */
+        .screenshot-edit-input {
+            background: #0f3460;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 100%;
+            min-width: 80px;
+        }
+        .screenshot-edit-input:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+        .screenshot-edit-select {
+            background: #0f3460;
+            color: #fff;
+            border: 1px solid #333;
+            padding: 6px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            width: 100%;
+        }
+        .screenshot-confidence-high { color: #2ecc71; }
+        .screenshot-confidence-medium { color: #f39c12; }
+        .screenshot-confidence-low { color: #e74c3c; }
+        .screenshot-preview-thumb {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #333;
+        }
     </style>
 </head>
 <body>
@@ -593,6 +628,9 @@
     <div class="tabs">
         <button class="tab active" onclick="showTab('import')" id="tab-import">
             📥 Import
+        </button>
+        <button class="tab" onclick="showTab('screenshots')" id="tab-screenshots">
+            📸 Screenshots
         </button>
         <button class="tab" onclick="showTab('payees')" id="tab-payees">
             🏪 Payees
@@ -718,6 +756,78 @@
         </div>
     </div>
 
+    <!-- Screenshots Tab -->
+    <div id="screenshotsTab" class="tab-content hidden">
+        <div class="card">
+            <h3>📸 Import ze zrzutów ekranu OKX</h3>
+            <p style="color: #888; margin-bottom: 15px;">
+                Wybierz jeden lub więcej zrzutów ekranu z zakładki Activity w aplikacji OKX.
+                OCR rozpozna transakcje, a Ty będziesz mógł je zweryfikować przed zapisaniem.
+            </p>
+            <label class="upload-area" id="screenshotDropZone">
+                <input type="file" id="screenshotInput" accept="image/*" multiple onchange="handleScreenshots(event)">
+                <p style="font-size: 24px; margin-bottom: 10px;">📸</p>
+                <p><strong>Kliknij lub przeciągnij zrzuty ekranu</strong></p>
+                <p style="color: #888; font-size: 12px; margin-top: 10px;">
+                    Możesz wybrać wiele plików jednocześnie
+                </p>
+            </label>
+            <div id="screenshotPreview" class="hidden" style="margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+            <div id="screenshotProgress" class="hidden" style="margin-top: 15px; color: #888;">
+                ⏳ Przetwarzanie <span id="screenshotProgressCount">0</span> zrzutów...
+            </div>
+        </div>
+
+        <div id="screenshotReviewArea" class="hidden">
+            <div class="card">
+                <div class="section-header">
+                    <h3>🔍 Weryfikacja transakcji</h3>
+                    <div style="display: flex; gap: 10px;">
+                        <span style="color: #888; font-size: 13px;">
+                            <span id="screenshotReviewCount">0</span> transakcji do importu
+                        </span>
+                        <button class="btn" onclick="confirmScreenshotImport()" id="screenshotConfirmBtn">
+                            ✅ Zapisz do bazy
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats" style="margin-bottom: 15px;">
+                    <div class="stat-box">
+                        <div class="stat-value" id="screenshotExpenseCount">0</div>
+                        <div class="stat-label">Wydatki</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="screenshotCashbackCount">0</div>
+                        <div class="stat-label">Cashback</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="screenshotTopupCount">0</div>
+                        <div class="stat-label">Zasilenia</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Payee</th>
+                            <th>Typ</th>
+                            <th>Kwota oryg.</th>
+                            <th>Waluta</th>
+                            <th>PLN ekw.</th>
+                            <th>USDG</th>
+                            <th>Confidence</th>
+                            <th>Kategoria</th>
+                            <th>Akcje</th>
+                        </tr>
+                    </thead>
+                    <tbody id="screenshotReviewTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <!-- Payees Tab -->
     <div id="payeesTab" class="tab-content hidden">
         <div class="card">
@@ -817,6 +927,9 @@
         let unmappedPayees = [];
         let mappedPayees = [];
         let currentImportBatchId = null;
+        let screenshotTransactions = [];
+        let currentScreenshotImportBatchId = null;
+        let selectedScreenshotFiles = [];
         
         // === UUID Generator ===
         function generateUUID() {
@@ -2002,6 +2115,183 @@
             } finally {
                 exportBtn.disabled = false;
                 exportBtn.textContent = '📥 Eksportuj do YNAB';
+            }
+        }
+
+        // === Screenshot Import ===
+        async function handleScreenshots(event) {
+            const files = Array.from(event.target.files || []);
+            if (files.length === 0) return;
+            await uploadScreenshots(files);
+        }
+
+        async function uploadScreenshots(files) {
+            selectedScreenshotFiles = files;
+
+            // Preview
+            const preview = document.getElementById('screenshotPreview');
+            preview.innerHTML = files.map(file => `
+                <img src="${URL.createObjectURL(file)}" class="screenshot-preview-thumb" title="${escapeHtml(file.name)}">
+            `).join('');
+            preview.classList.remove('hidden');
+
+            const progress = document.getElementById('screenshotProgress');
+            const progressCount = document.getElementById('screenshotProgressCount');
+            progress.classList.remove('hidden');
+            progressCount.textContent = files.length;
+
+            const formData = new FormData();
+            files.forEach(file => formData.append('screenshots', file));
+
+            try {
+                const response = await fetch(`${API_BASE}/import/screenshots`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${getAuthToken()}` },
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        localStorage.removeItem(AUTH_STORAGE_KEY);
+                        location.reload();
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                screenshotTransactions = result.transactions || [];
+                currentScreenshotImportBatchId = result.importBatchId;
+
+                renderScreenshotReviewTable();
+                updateScreenshotStats();
+
+                document.getElementById('screenshotReviewArea').classList.remove('hidden');
+
+            } catch (err) {
+                alert('❌ Błąd przetwarzania zrzutów: ' + err.message);
+            } finally {
+                progress.classList.add('hidden');
+            }
+        }
+
+        function updateScreenshotStats() {
+            document.getElementById('screenshotReviewCount').textContent = screenshotTransactions.length;
+            document.getElementById('screenshotExpenseCount').textContent = screenshotTransactions.filter(t => t.type === 'expense').length;
+            document.getElementById('screenshotCashbackCount').textContent = screenshotTransactions.filter(t => t.type === 'cashback').length;
+            document.getElementById('screenshotTopupCount').textContent = screenshotTransactions.filter(t => t.type === 'topup').length;
+        }
+
+        function confidenceClass(conf) {
+            if (conf >= 0.8) return 'screenshot-confidence-high';
+            if (conf >= 0.6) return 'screenshot-confidence-medium';
+            return 'screenshot-confidence-low';
+        }
+
+        function renderScreenshotReviewTable() {
+            const tbody = document.getElementById('screenshotReviewTable');
+            if (screenshotTransactions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="empty-state">Brak transakcji do weryfikacji</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = screenshotTransactions.map((tx, index) => `
+                <tr data-screenshot-index="${index}">
+                    <td><input type="date" class="screenshot-edit-input" value="${escapeHtml(tx.date || '')}" onchange="updateScreenshotTransactionField(${index}, 'date', this.value)"></td>
+                    <td><input type="text" class="screenshot-edit-input" value="${escapeHtml(tx.payee || '')}" onchange="updateScreenshotTransactionField(${index}, 'payee', this.value)"></td>
+                    <td>
+                        <select class="screenshot-edit-select" onchange="updateScreenshotTransactionField(${index}, 'type', this.value)">
+                            <option value="expense" ${tx.type === 'expense' ? 'selected' : ''}>Wydatek</option>
+                            <option value="cashback" ${tx.type === 'cashback' ? 'selected' : ''}>Cashback</option>
+                            <option value="topup" ${tx.type === 'topup' ? 'selected' : ''}>Zasilenie</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.01" class="screenshot-edit-input" value="${tx.originalAmount !== null ? tx.originalAmount : ''}" onchange="updateScreenshotTransactionField(${index}, 'originalAmount', this.value)"></td>
+                    <td>
+                        <select class="screenshot-edit-select" onchange="updateScreenshotTransactionField(${index}, 'originalCurrency', this.value)">
+                            <option value="PLN" ${tx.originalCurrency === 'PLN' ? 'selected' : ''}>PLN</option>
+                            <option value="EUR" ${tx.originalCurrency === 'EUR' ? 'selected' : ''}>EUR</option>
+                            <option value="USD" ${tx.originalCurrency === 'USD' ? 'selected' : ''}>USD</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.01" class="screenshot-edit-input" value="${tx.plnEquivalent !== null && tx.plnEquivalent !== undefined ? tx.plnEquivalent.toFixed(2) : ''}" onchange="updateScreenshotTransactionField(${index}, 'plnEquivalent', this.value)"></td>
+                    <td><input type="text" class="screenshot-edit-input" value="${escapeHtml(tx.usdgRaw || tx.usdgAmount || '')}" onchange="updateScreenshotTransactionField(${index}, 'usdgRaw', this.value)"></td>
+                    <td class="${confidenceClass(tx.confidence)}">${Math.round((tx.confidence || 0) * 100)}%</td>
+                    <td>
+                        <select class="screenshot-edit-select category-select" onchange="updateScreenshotTransactionField(${index}, 'categoryId', this.value)">
+                            <option value="">-- Wybierz --</option>
+                            ${ynabCategories.map(cat => `
+                                <option value="${cat.id}" ${tx.categoryId === cat.id ? 'selected' : ''}>${escapeHtml(cat.name)}</option>
+                            `).join('')}
+                        </select>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteScreenshotTransaction(${index})" title="Usuń transakcję">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateScreenshotTransactionField(index, field, value) {
+            const tx = screenshotTransactions[index];
+            if (!tx) return;
+
+            if (field === 'originalAmount' || field === 'plnEquivalent') {
+                tx[field] = value === '' ? null : parseFloat(value);
+            } else if (field === 'categoryId') {
+                tx[field] = value || null;
+            } else {
+                tx[field] = value;
+            }
+
+            // Synchronizuj amount z plnEquivalent dla reszty aplikacji
+            if (field === 'plnEquivalent' && tx.plnEquivalent !== null) {
+                tx.amount = tx.plnEquivalent;
+            }
+
+            updateScreenshotStats();
+        }
+
+        function deleteScreenshotTransaction(index) {
+            if (!confirm('Usunąć tę transakcję z importu?')) return;
+            screenshotTransactions.splice(index, 1);
+            renderScreenshotReviewTable();
+            updateScreenshotStats();
+        }
+
+        async function confirmScreenshotImport() {
+            if (screenshotTransactions.length === 0) {
+                alert('Brak transakcji do zapisania');
+                return;
+            }
+
+            const confirmBtn = document.getElementById('screenshotConfirmBtn');
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = '⏳ Zapisywanie...';
+
+            try {
+                const result = await apiPost('/import/screenshots/confirm', {
+                    importBatchId: currentScreenshotImportBatchId,
+                    transactions: screenshotTransactions
+                });
+
+                alert(`✅ Zapisano ${result.importedTransactions} transakcji\nDuplikaty pominięte: ${result.duplicateCount}`);
+
+                screenshotTransactions = [];
+                currentScreenshotImportBatchId = null;
+                document.getElementById('screenshotReviewArea').classList.add('hidden');
+                document.getElementById('screenshotPreview').classList.add('hidden');
+                document.getElementById('screenshotInput').value = '';
+
+                await loadPayees();
+                await loadUnexportedTransactions();
+
+            } catch (err) {
+                alert('❌ Błąd zapisywania: ' + err.message);
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = '✅ Zapisz do bazy';
             }
         }
 

@@ -151,13 +151,47 @@ async function findPayeesByKeyword(keyword) {
 
 // === Transactions ===
 
-async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null, importBatchId = null) {
+async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null, importBatchId = null, sourceType = 'csv', originalAmount = null, originalCurrency = null, plnEquivalent = null) {
+  // Named params support: if first argument is an object, unpack it.
+  let params;
+  if (payeeId && typeof payeeId === 'object') {
+    params = payeeId;
+  } else {
+    params = {
+      payeeId,
+      bookingDate,
+      operationDate,
+      amount,
+      rawData,
+      categoryId,
+      importBatchId,
+      sourceType,
+      originalAmount,
+      originalCurrency,
+      plnEquivalent
+    };
+  }
+
+  const {
+    payeeId: pId,
+    bookingDate: bDate,
+    operationDate: oDate,
+    amount: amt,
+    rawData: rData,
+    categoryId: cId,
+    importBatchId: batchId,
+    sourceType: sType,
+    originalAmount: oAmt,
+    originalCurrency: oCurr,
+    plnEquivalent: plnEq
+  } = params;
+
   // Check if this exact transaction already exists
   const checkResult = await pool.query(
     `SELECT * FROM transactions
      WHERE payee_id = $1 AND booking_date = $2 AND amount = $3
      AND (import_batch_id = $4 OR import_batch_id IS NULL)`,
-    [payeeId, bookingDate, amount, importBatchId]
+    [pId, bDate, amt, batchId]
   );
 
   if (checkResult.rows.length > 0) {
@@ -165,13 +199,13 @@ async function createTransaction(payeeId, bookingDate, operationDate, amount, ra
     // Already exists — treat as duplicate
     return { ...existing, isDuplicate: true };
   }
-  
+
   const result = await pool.query(
-    `INSERT INTO transactions 
-     (payee_id, booking_date, operation_date, amount, raw_data, category_id, import_batch_id) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7) 
+    `INSERT INTO transactions
+     (payee_id, booking_date, operation_date, amount, raw_data, category_id, import_batch_id, source_type, original_amount, original_currency, pln_equivalent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
-    [payeeId, bookingDate, operationDate, amount, JSON.stringify(rawData), categoryId, importBatchId]
+    [pId, bDate, oDate, amt, JSON.stringify(rData), cId, batchId, sType || 'csv', oAmt, oCurr, plnEq]
   );
   return { ...result.rows[0], isDuplicate: false };
 }

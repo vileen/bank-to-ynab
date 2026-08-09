@@ -69,14 +69,40 @@ npx serve . -p 8080
 4. Kategorie zostaną automatycznie przypisane (jeśli masz mapowania)
 5. Eksportuj transakcje bezpośrednio do YNAB
 
-## Obsługiwane banki
+## Obsługiwane banki / źródła
 
-| Bank | Status | Uwagi |
-|------|--------|-------|
+| Bank / Źródło | Status | Uwagi |
+|------|--------|--------|
 | 🇵🇱 **Santander Polska** | ✅ Gotowe | Karta kredytowa, eksport CSV |
+| 💳 **OKX Card** | ✅ Gotowe | Import ze zrzutów ekranu (OCR) |
 | 🇵🇱 mBank | 🚧 Planowane | - |
 | 🇵🇱 ING | 🚧 Planowane | - |
 | 🇵🇱 PKO BP | 🚧 Planowane | - |
+
+## Import ze zrzutów ekranu OKX
+
+OKX nie udostępnia eksportu transakcji z karty. Aplikacja obsługuje import ze zrzutów ekranu zakładki **Activity**:
+
+1. Wejdź w zakładkę **Screenshots**.
+2. Wybierz jeden lub więcej zrzutów ekranu z aplikacji OKX.
+3. Lokalne OCR (Tesseract) wyciąga tekst z obrazów.
+4. Zweryfikuj rozpoznane transakcje w tabeli — możesz edytować datę, payee, kwotę, typ, walutę i kategorię.
+5. Kliknij **Zapisz do bazy** — transakcje trafiają do istniejącego flow kategoryzacji i eksportu do YNAB.
+
+### Obsługiwane typy transakcji OKX
+
+| Typ | Opis | Mapowanie w YNAB |
+|-----|------|-----------------|
+| Wydatek | Płatność kartą | Outflow |
+| Cashback | Nagroda karty (EUR) | Inflow jako `OKX Card Rewards` |
+| Zasilenie | ADD / doładowanie konta | Inflow jako `OKX Account Top-Up` |
+
+### Uwagi OCR
+
+- Tesseract czasem czyta `zł` jako `zt` — parser normalizuje to do `PLN`.
+- Cashback w EUR jest konwertowany na PLN kursem NBP z dnia poprzedniego.
+- Wydatki w walutach obcych (EUR/USD) są konwertowane kursem NBP z dnia transakcji.
+- USDG to wartość referencyjna — nie jest używana jako waluta budżetowa.
 
 ## Mapowania kategorii
 
@@ -104,6 +130,10 @@ Przy imporcie CSV aplikacja automatycznie przypisze kategorie na podstawie tych 
 - `GET /api/mappings` — lista mapowań
 - `POST /api/mappings` — dodaj mapowanie
 - `DELETE /api/mappings/:keyword` — usuń mapowanie
+
+### Screenshot Import (OKX)
+- `POST /api/import/screenshots` — upload wielu obrazów, zwraca rozpoznane transakcje do weryfikacji (bez zapisu do bazy)
+- `POST /api/import/screenshots/confirm` — zapisuje zweryfikowane transakcje do bazy
 
 ### Health
 - `GET /api/health` — status połączenia

@@ -1,1 +1,8 @@
 AGENTS.md
+backend/uploads/
+backend/backups/
+backend/data/
+backend/node_modules/
+node_modules/
+*.log
+.DS_Store
