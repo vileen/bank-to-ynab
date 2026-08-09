@@ -35,6 +35,7 @@ function requireAuth(req, res, next) {
 // Middleware
 const allowedOrigins = [
   'http://localhost:8080',
+  'http://127.0.0.1:8080',
   'https://ynab.vileen.pl',
   'https://vileen.github.io',
   'https://vileen.github.io/bank-to-ynab'
