@@ -1834,22 +1834,14 @@
                     <td>${escapeHtml(tx.payee)}</td>
                     <td style="color: ${tx.amount < 0 ? '#e74c3c' : '#2ecc71'}">${parseFloat(tx.amount).toFixed(2)}</td>
                     <td>
-                        <div class="searchable-select tx-category-select" style="min-width: 200px;">
-                            <input type="text" class="searchable-select-input" 
-                                   value="${escapeHtml(tx.category_name === 'Uncategorized' ? '' : tx.category_name)}"
-                                   placeholder="Wybierz kategorię..."
-                                   onclick="toggleTxDropdown(${index})" 
-                                   oninput="filterTxCategories(${index}, this.value)">
-                            <div class="searchable-select-dropdown" id="tx-dropdown-${index}">
-                                ${ynabCategories.map(cat => `
-                                    <div class="searchable-select-item ${cat.id === tx.category_id ? 'selected' : ''}" 
-                                         data-value="${cat.id}" 
-                                         onclick="selectTxCategory(${index}, '${cat.id}', '${escapeHtml(cat.name)}')">
-                                        ${escapeHtml(cat.name)}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
+                        <select class="category-select" style="min-width: 200px;" onchange="changeTxCategory(${index}, this.value)">
+                            <option value="" ${!tx.category_id ? 'selected' : ''}>-- Wybierz kategorię --</option>
+                            ${ynabCategories.map(cat => `
+                                <option value="${cat.id}" ${cat.id === tx.category_id ? 'selected' : ''}>
+                                    ${escapeHtml(cat.name)}
+                                </option>
+                            `).join('')}
+                        </select>
                     </td>
                     <td>
                         <button class="btn btn-danger" onclick="deleteTransactionById(${tx.id}, ${index})" title="Usuń transakcję">
@@ -1930,51 +1922,11 @@
             }
         }
         
-        // === Transaction Category Dropdown Functions ===
-        function toggleTxDropdown(index) {
-            const dropdown = document.getElementById(`tx-dropdown-${index}`);
-            // Close all other tx dropdowns
-            document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dd => {
-                if (dd.id !== `tx-dropdown-${index}`) {
-                    dd.classList.remove('active');
-                }
-            });
-            dropdown.classList.toggle('active');
-        }
-        
-        function filterTxCategories(index, searchTerm) {
-            const dropdown = document.getElementById(`tx-dropdown-${index}`);
-            const items = dropdown.querySelectorAll('.searchable-select-item');
-            
-            items.forEach(item => {
-                const text = item.textContent.toLowerCase();
-                if (text.includes(searchTerm.toLowerCase())) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
-            
-            dropdown.classList.add('active');
-        }
-        
-        function selectTxCategory(index, categoryId, categoryName) {
-            // Update transaction in memory
+        // === Transaction Category Select Function ===
+        function changeTxCategory(index, categoryId) {
+            const category = ynabCategories.find(c => c.id === categoryId);
             allTransactions[index].category_id = categoryId;
-            allTransactions[index].category_name = categoryName;
-            
-            // Update input value
-            const row = document.querySelector(`tr[data-tx-index="${index}"]`);
-            const input = row.querySelector('.searchable-select-input');
-            input.value = categoryName;
-            
-            // Close dropdown
-            document.getElementById(`tx-dropdown-${index}`).classList.remove('active');
-            
-            // Update selected styling
-            row.querySelectorAll('.searchable-select-item').forEach(item => {
-                item.classList.toggle('selected', item.dataset.value === categoryId);
-            });
+            allTransactions[index].category_name = category ? category.name : 'Uncategorized';
         }
         
         // === Account Dropdown Functions ===
