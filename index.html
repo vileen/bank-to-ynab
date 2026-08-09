@@ -1168,13 +1168,46 @@
             // Update searchable dropdown for mapping
             renderCategoryDropdown(ynabCategories);
             
-            // Re-render tables so searchable category dropdowns get populated
-            if (allTransactions.length > 0) {
-                renderTransactionsTable();
-            }
-            if (screenshotTransactions.length > 0) {
-                renderScreenshotReviewTable();
-            }
+            // Populate searchable category dropdowns in tables
+            populateSearchableCategoryDropdowns();
+        }
+        
+        function populateSearchableCategoryDropdowns() {
+            // Populate transaction category dropdowns
+            document.querySelectorAll('#transactionsTable .searchable-select-dropdown').forEach(dropdown => {
+                const row = dropdown.closest('tr[data-tx-index]');
+                if (!row) return;
+                const index = parseInt(row.dataset.txIndex, 10);
+                const tx = allTransactions[index];
+                if (!tx) return;
+                const currentCategoryId = tx.category_id || '';
+                
+                dropdown.innerHTML = ynabCategories.map(cat => `
+                    <div class="searchable-select-item ${cat.id === currentCategoryId ? 'selected' : ''}" 
+                         data-value="${cat.id}" 
+                         onclick="selectTxCategory(${index}, this.dataset.value, this.textContent)">
+                        ${escapeHtml(cat.name)}
+                    </div>
+                `).join('');
+            });
+            
+            // Populate screenshot review category dropdowns
+            document.querySelectorAll('#screenshotReviewTable .searchable-select-dropdown').forEach(dropdown => {
+                const row = dropdown.closest('tr[data-screenshot-index]');
+                if (!row) return;
+                const index = parseInt(row.dataset.screenshotIndex, 10);
+                const tx = screenshotTransactions[index];
+                if (!tx) return;
+                const currentCategoryId = tx.categoryId || '';
+                
+                dropdown.innerHTML = ynabCategories.map(cat => `
+                    <div class="searchable-select-item ${cat.id === currentCategoryId ? 'selected' : ''}" 
+                         data-value="${cat.id}" 
+                         onclick="selectScreenshotCategory(${index}, this.dataset.value, this.textContent)">
+                        ${escapeHtml(cat.name)}
+                    </div>
+                `).join('');
+            });
         }
         
         // === Searchable Dropdown Functions ===
