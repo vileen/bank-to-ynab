@@ -782,10 +782,14 @@
             <div class="card">
                 <div class="section-header">
                     <h3>🔍 Weryfikacja transakcji</h3>
-                    <div style="display: flex; gap: 10px;">
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span style="color: #888; font-size: 13px;" id="screenshotSessionInfo"></span>
                         <span style="color: #888; font-size: 13px;">
                             <span id="screenshotReviewCount">0</span> transakcji do importu
                         </span>
+                        <button class="btn btn-secondary" onclick="clearScreenshotSession()" id="screenshotClearBtn">
+                            🗑️ Wyczyść sesję
+                        </button>
                         <button class="btn" onclick="confirmScreenshotImport()" id="screenshotConfirmBtn">
                             ✅ Zapisz do bazy
                         </button>
@@ -929,7 +933,9 @@
         let currentImportBatchId = null;
         let screenshotTransactions = [];
         let currentScreenshotImportBatchId = null;
+        let currentScreenshotSessionId = null;
         let selectedScreenshotFiles = [];
+        const SCREENSHOT_SESSION_KEY = 'bank-to-ynab-screenshot-session';
         
         // === UUID Generator ===
         function generateUUID() {
@@ -997,6 +1003,7 @@
             await loadPayees();
             await loadUnexportedTransactions();
             await updateLastExportLabel();
+            await loadPendingScreenshotSession();
         }
 
         // === API Functions ===
@@ -2183,9 +2190,15 @@
                 const result = await response.json();
                 screenshotTransactions = result.transactions || [];
                 currentScreenshotImportBatchId = result.importBatchId;
+                currentScreenshotSessionId = result.sessionId || null;
+
+                if (currentScreenshotSessionId) {
+                    localStorage.setItem(SCREENSHOT_SESSION_KEY, currentScreenshotSessionId);
+                }
 
                 renderScreenshotReviewTable();
                 updateScreenshotStats();
+                updateScreenshotSessionInfo();
 
                 document.getElementById('screenshotReviewArea').classList.remove('hidden');
 
@@ -2336,6 +2349,74 @@
             updateScreenshotStats();
         }
 
+        function updateScreenshotSessionInfo() {
+            const infoEl = document.getElementById('screenshotSessionInfo');
+            if (currentScreenshotSessionId) {
+                infoEl.textContent = `Sesja: ${currentScreenshotSessionId.slice(0, 8)}...`;
+            } else {
+                infoEl.textContent = '';
+            }
+        }
+
+        async function loadPendingScreenshotSession() {
+            const sessionId = localStorage.getItem(SCREENSHOT_SESSION_KEY);
+            if (!sessionId) return;
+
+            try {
+                const result = await apiGet(`/import/screenshots/${sessionId}`);
+                if (result.success && result.data) {
+                    screenshotTransactions = result.data.transactions || [];
+                    currentScreenshotImportBatchId = result.data.importBatchId || result.importBatchId;
+                    currentScreenshotSessionId = result.sessionId;
+
+                    renderScreenshotReviewTable();
+                    updateScreenshotStats();
+                    updateScreenshotSessionInfo();
+
+                    document.getElementById('screenshotReviewArea').classList.remove('hidden');
+
+                    // Przywróć podgląd (nie mamy już plików, więc tylko informacja)
+                    const preview = document.getElementById('screenshotPreview');
+                    preview.innerHTML = `<div style="color: #888; font-size: 13px;">Przywrócono sesję z ${screenshotTransactions.length} transakcjami</div>`;
+                    preview.classList.remove('hidden');
+                } else {
+                    localStorage.removeItem(SCREENSHOT_SESSION_KEY);
+                }
+            } catch (err) {
+                console.error('Failed to load pending screenshot session:', err);
+                localStorage.removeItem(SCREENSHOT_SESSION_KEY);
+            }
+        }
+
+        async function clearScreenshotSession() {
+            if (!currentScreenshotSessionId) {
+                screenshotTransactions = [];
+                currentScreenshotImportBatchId = null;
+                document.getElementById('screenshotReviewArea').classList.add('hidden');
+                document.getElementById('screenshotPreview').classList.add('hidden');
+                document.getElementById('screenshotInput').value = '';
+                localStorage.removeItem(SCREENSHOT_SESSION_KEY);
+                return;
+            }
+
+            if (!confirm('Usunąć tę sesję review? Oryginalne zrzuty ekranu zostaną zachowane na serwerze.')) {
+                return;
+            }
+
+            try {
+                await apiDelete(`/import/screenshots/${currentScreenshotSessionId}`);
+                screenshotTransactions = [];
+                currentScreenshotImportBatchId = null;
+                currentScreenshotSessionId = null;
+                document.getElementById('screenshotReviewArea').classList.add('hidden');
+                document.getElementById('screenshotPreview').classList.add('hidden');
+                document.getElementById('screenshotInput').value = '';
+                localStorage.removeItem(SCREENSHOT_SESSION_KEY);
+            } catch (err) {
+                alert('❌ Błąd czyszczenia sesji: ' + err.message);
+            }
+        }
+
         async function confirmScreenshotImport() {
             if (screenshotTransactions.length === 0) {
                 alert('Brak transakcji do zapisania');
@@ -2349,6 +2430,7 @@
             try {
                 const result = await apiPost('/import/screenshots/confirm', {
                     importBatchId: currentScreenshotImportBatchId,
+                    sessionId: currentScreenshotSessionId,
                     transactions: screenshotTransactions
                 });
 
@@ -2356,9 +2438,11 @@
 
                 screenshotTransactions = [];
                 currentScreenshotImportBatchId = null;
+                currentScreenshotSessionId = null;
                 document.getElementById('screenshotReviewArea').classList.add('hidden');
                 document.getElementById('screenshotPreview').classList.add('hidden');
                 document.getElementById('screenshotInput').value = '';
+                localStorage.removeItem(SCREENSHOT_SESSION_KEY);
 
                 await loadPayees();
                 await loadUnexportedTransactions();

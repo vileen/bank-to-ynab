@@ -74,3 +74,24 @@ CREATE TRIGGER update_payees_updated_at
     BEFORE UPDATE ON payees
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Screenshot review sessions: stores temporary parsed screenshot data
+-- until the user confirms or discards the import
+CREATE TABLE IF NOT EXISTS screenshot_review_sessions (
+    id SERIAL PRIMARY KEY,
+    session_id VARCHAR(255) UNIQUE NOT NULL,
+    import_batch_id VARCHAR(255),
+    data JSONB NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_screenshot_sessions_session_id ON screenshot_review_sessions(session_id);
+CREATE INDEX IF NOT EXISTS idx_screenshot_sessions_status ON screenshot_review_sessions(status);
+
+DROP TRIGGER IF EXISTS update_screenshot_sessions_updated_at ON screenshot_review_sessions;
+CREATE TRIGGER update_screenshot_sessions_updated_at
+    BEFORE UPDATE ON screenshot_review_sessions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

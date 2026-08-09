@@ -39,7 +39,7 @@ const upload = multer({
 /**
  * POST /api/import/screenshots
  * Upload wielu zrzutów ekranu, OCR, parsowanie, zwraca transakcje do review.
- * Nie zapisuje do bazy danych.
+ * Zapisuje wyniki w tabeli screenshot_review_sessions (sesja tymczasowa).
  */
 router.post('/', upload.array('screenshots', 50), async (req, res) => {
   try {
@@ -99,9 +99,43 @@ router.post('/', upload.array('screenshots', 50), async (req, res) => {
     // Globalna deduplikacja pomiędzy plikami
     const finalTransactions = okxParser.deduplicateTransactions(allParsedTransactions);
 
+    // Auto-mapowanie payees do istniejących kategorii
+    for (const tx of finalTransactions) {
+      const payeeName = tx.payee || 'Unknown';
+      const normalizedName = normalizePayeeName(payeeName);
+      const existingPayee = await db.getPayeeByNormalizedName(normalizedName);
+
+      if (existingPayee && existingPayee.ynab_category_id) {
+        tx.categoryId = existingPayee.ynab_category_id;
+        tx.categoryName = existingPayee.ynab_category_name;
+      } else {
+        // Upewnij się, że payee istnieje w bazie i sprawdź mapowania
+        const payee = await db.getOrCreatePayee(payeeName, normalizedName);
+        const mapping = await db.findMappingForPayee(normalizedName);
+        if (mapping) {
+          tx.categoryId = mapping.ynabCategoryId;
+          tx.categoryName = mapping.ynabCategoryName;
+          // Przypisz mapowanie do payee jeśli jeszcze go nie ma
+          if (!payee.mapping_id) {
+            await db.updatePayeeMapping(payee.id, mapping.id);
+          }
+        }
+      }
+    }
+
+    // Zapisz sesję review w bazie
+    const sessionId = crypto.randomUUID();
+    await db.createScreenshotSession(sessionId, importBatchId, {
+      importBatchId,
+      fileCount: files.length,
+      transactions: finalTransactions,
+      files: fileResults
+    });
+
     res.json({
       success: true,
       importBatchId,
+      sessionId,
       fileCount: files.length,
       transactionCount: finalTransactions.length,
       transactions: finalTransactions,
@@ -122,13 +156,53 @@ function normalizePayeeName(name) {
 }
 
 /**
+ * GET /api/import/screenshots/:sessionId
+ * Pobiera zapisaną sesję review ze zrzutów ekranu.
+ */
+router.get('/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const session = await db.getScreenshotSession(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ error: 'Session not found or already confirmed' });
+    }
+
+    res.json({
+      success: true,
+      sessionId: session.session_id,
+      importBatchId: session.import_batch_id,
+      data: session.data
+    });
+  } catch (error) {
+    console.error('Screenshot session get error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * DELETE /api/import/screenshots/:sessionId
+ * Usuwa sesję review (odrzuca ją).
+ */
+router.delete('/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    await db.deleteScreenshotSession(sessionId);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Screenshot session delete error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/import/screenshots/confirm
  * Zapisuje potwierdzone transakcje do bazy danych.
- * Body: { importBatchId, transactions: Array }
+ * Body: { importBatchId, sessionId, transactions: Array }
  */
 router.post('/confirm', async (req, res) => {
   try {
-    const { importBatchId, transactions } = req.body;
+    const { importBatchId, sessionId, transactions } = req.body;
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ error: 'No transactions to confirm' });
     }
@@ -192,12 +266,18 @@ router.post('/confirm', async (req, res) => {
     // Auto-kategoryzacja dla nowych payees
     await db.autoCategorizeTransactions();
 
+    // Oznacz sesję jako potwierdzoną (lub usuń ją)
+    if (sessionId) {
+      await db.markScreenshotSessionConfirmed(sessionId);
+    }
+
     res.json({
       success: true,
       importedTransactions: importedTransactions.length,
       duplicateCount,
       duplicates,
-      importBatchId
+      importBatchId,
+      sessionId: sessionId || null
     });
   } catch (error) {
     console.error('Screenshot confirm error:', error);

@@ -19,6 +19,28 @@ async function initDb() {
   try {
     const client = await pool.connect();
     console.log('✅ PostgreSQL connected');
+
+    // Ensure screenshot review sessions table exists
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS screenshot_review_sessions (
+        id SERIAL PRIMARY KEY,
+        session_id VARCHAR(255) UNIQUE NOT NULL,
+        import_batch_id VARCHAR(255),
+        data JSONB NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_screenshot_sessions_session_id
+      ON screenshot_review_sessions(session_id)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_screenshot_sessions_status
+      ON screenshot_review_sessions(status)
+    `);
+
     client.release();
   } catch (err) {
     console.error('❌ Database connection failed:', err.message);
@@ -145,6 +167,89 @@ async function findPayeesByKeyword(keyword) {
      WHERE normalized_name ILIKE $1 
      ORDER BY transaction_count DESC`,
     [`%${keyword.toLowerCase()}%`]
+  );
+  return result.rows;
+}
+
+async function getPayeeByNormalizedName(normalizedName) {
+  const result = await pool.query(
+    `SELECT p.*, m.ynab_category_id, m.ynab_category_name
+     FROM payees p
+     LEFT JOIN mappings m ON m.id = p.mapping_id
+     WHERE p.normalized_name = $1`,
+    [normalizedName.toLowerCase()]
+  );
+  return result.rows[0] || null;
+}
+
+async function findMappingForPayee(normalizedName) {
+  const mappings = await getMappings();
+  const payeeName = normalizedName.toLowerCase();
+  for (const [keyword, mapping] of Object.entries(mappings)) {
+    if (payeeName.includes(keyword.toLowerCase())) {
+      return mapping;
+    }
+  }
+  return null;
+}
+
+// === Screenshot Review Sessions ===
+
+async function createScreenshotSession(sessionId, importBatchId, data) {
+  const result = await pool.query(
+    `INSERT INTO screenshot_review_sessions (session_id, import_batch_id, data)
+     VALUES ($1, $2, $3)
+     RETURNING *`,
+    [sessionId, importBatchId, JSON.stringify(data)]
+  );
+  return result.rows[0];
+}
+
+async function getScreenshotSession(sessionId) {
+  const result = await pool.query(
+    `SELECT * FROM screenshot_review_sessions
+     WHERE session_id = $1 AND status = 'pending'`,
+    [sessionId]
+  );
+  return result.rows[0] || null;
+}
+
+async function updateScreenshotSession(sessionId, data) {
+  const result = await pool.query(
+    `UPDATE screenshot_review_sessions
+     SET data = $1, updated_at = CURRENT_TIMESTAMP
+     WHERE session_id = $2 AND status = 'pending'
+     RETURNING *`,
+    [JSON.stringify(data), sessionId]
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteScreenshotSession(sessionId) {
+  await pool.query(
+    `DELETE FROM screenshot_review_sessions WHERE session_id = $1`,
+    [sessionId]
+  );
+}
+
+async function markScreenshotSessionConfirmed(sessionId) {
+  const result = await pool.query(
+    `UPDATE screenshot_review_sessions
+     SET status = 'confirmed', updated_at = CURRENT_TIMESTAMP
+     WHERE session_id = $1
+     RETURNING *`,
+    [sessionId]
+  );
+  return result.rows[0] || null;
+}
+
+async function getPendingScreenshotSessions(limit = 10) {
+  const result = await pool.query(
+    `SELECT * FROM screenshot_review_sessions
+     WHERE status = 'pending'
+     ORDER BY updated_at DESC
+     LIMIT $1`,
+    [limit]
   );
   return result.rows;
 }
@@ -374,6 +479,14 @@ module.exports = {
   getPayeesWithMapping,
   updatePayeeMapping,
   findPayeesByKeyword,
+  getPayeeByNormalizedName,
+  findMappingForPayee,
+  createScreenshotSession,
+  getScreenshotSession,
+  updateScreenshotSession,
+  deleteScreenshotSession,
+  markScreenshotSessionConfirmed,
+  getPendingScreenshotSessions,
   createTransaction,
   getRecentTransactions,
   clearOldTransactions,
