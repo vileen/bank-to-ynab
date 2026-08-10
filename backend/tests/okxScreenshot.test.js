@@ -153,6 +153,42 @@ Jul 30, 2026 -8.8 USDG`;
   assert.strictEqual(result.transactions[0].date, '2026-07-30');
 });
 
+test('skips voided transaction when Voided is in the same line', () => {
+  const ocrText = `= MERCHANT -€10.00 Voided
+Jul 30, 2026 -10.00 USDG
+= LIDL 1671 -zł25.00
+Jul 30, 2026 -25.00 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 1);
+  assert.strictEqual(result.transactions[0].payee, 'LIDL 1671');
+});
+
+test('removes transaction when Voided is a separate status line', () => {
+  const ocrText = `= MERCHANT -€10.00
+Voided
+Jul 30, 2026 -10.00 USDG
+= LIDL 1671 -zł25.00
+Jul 30, 2026 -25.00 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 1);
+  assert.strictEqual(result.transactions[0].payee, 'LIDL 1671');
+});
+
+test('removes voided transaction and its attached USDG detail', () => {
+  const ocrText = `= MERCHANT -€10.00
+Jul 30, 2026 -10.00 USDG
+Voided
+= LIDL 1671 -zł25.00
+Jul 30, 2026 -25.00 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 1);
+  assert.strictEqual(result.transactions[0].payee, 'LIDL 1671');
+  assert.strictEqual(result.transactions[0].usdgAmount, -25);
+});
+
 test('orphan cashback at end of file is still imported', () => {
   const ocrText = `G Card rewards +€0.50
 Jul 30, 2026 +0.60 USDG`;

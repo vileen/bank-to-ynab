@@ -123,6 +123,14 @@ function isPayBoostLine(line) {
   return /pay\s*boost/i.test(line);
 }
 
+function isVoidedLine(line) {
+  return /\bvoided\b/i.test(line);
+}
+
+function isVoidedTransaction(line) {
+  return /voided/i.test(line) && (hasCurrencyAmount(line) || containsUSDG(line));
+}
+
 function containsUSDG(line) {
   return /USDG/i.test(line) || /Multi-crypto/i.test(line);
 }
@@ -224,6 +232,20 @@ function parseOCRText(ocrText) {
     // Skip Pay Boost rewards - they are not real transactions.
     if (isPayBoostLine(line)) {
       inSkipBlock = true;
+      continue;
+    }
+
+    // Voided transaction line - refund/reversal, skip it entirely.
+    if (isVoidedTransaction(line)) {
+      continue;
+    }
+
+    // Standalone Voided status line - void/refund the immediately preceding transaction.
+    if (isVoidedLine(line)) {
+      const lastTx = getLastTransaction();
+      if (lastTx) {
+        transactions.pop();
+      }
       continue;
     }
 
