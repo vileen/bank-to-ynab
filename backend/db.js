@@ -113,16 +113,17 @@ async function deleteMapping(id) {
 
 // === Payees ===
 
-async function getOrCreatePayee(name, normalizedName) {
+async function getOrCreatePayee(name, normalizedName, client = null) {
+  const query = client || pool;
   // Try to find existing payee
-  let result = await pool.query(
+  let result = await query.query(
     'SELECT * FROM payees WHERE normalized_name = $1',
     [normalizedName.toLowerCase()]
   );
   
   if (result.rows.length > 0) {
     // Update last seen and count
-    await pool.query(
+    await query.query(
       `UPDATE payees 
        SET transaction_count = transaction_count + 1, 
            last_seen_at = CURRENT_TIMESTAMP 
@@ -130,12 +131,12 @@ async function getOrCreatePayee(name, normalizedName) {
       [result.rows[0].id]
     );
     // Return updated payee
-    result = await pool.query('SELECT * FROM payees WHERE id = $1', [result.rows[0].id]);
+    result = await query.query('SELECT * FROM payees WHERE id = $1', [result.rows[0].id]);
     return result.rows[0];
   }
   
   // Create new payee
-  result = await pool.query(
+  result = await query.query(
     `INSERT INTO payees (name, normalized_name) 
      VALUES ($1, $2) 
      RETURNING *`,
@@ -266,11 +267,12 @@ async function getPendingScreenshotSessions(limit = 10) {
 
 // === Transactions ===
 
-async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null, importBatchId = null, sourceType = 'csv', originalAmount = null, originalCurrency = null, plnEquivalent = null) {
+async function createTransaction(payeeId, bookingDate, operationDate, amount, rawData, categoryId = null, importBatchId = null, sourceType = 'csv', originalAmount = null, originalCurrency = null, plnEquivalent = null, client = null) {
   // Named params support: if first argument is an object, unpack it.
   let params;
   if (payeeId && typeof payeeId === 'object') {
     params = payeeId;
+    if (params.client) client = params.client;
   } else {
     params = {
       payeeId,
@@ -302,9 +304,11 @@ async function createTransaction(payeeId, bookingDate, operationDate, amount, ra
     skipDuplicateCheck
   } = params;
 
+  const query = client || pool;
+
   if (!skipDuplicateCheck) {
     // Check if this exact transaction already exists
-    const checkResult = await pool.query(
+    const checkResult = await query.query(
       `SELECT * FROM transactions
        WHERE payee_id = $1 AND booking_date = $2 AND amount = $3
        AND (import_batch_id = $4 OR import_batch_id IS NULL)`,
@@ -318,7 +322,7 @@ async function createTransaction(payeeId, bookingDate, operationDate, amount, ra
     }
   }
 
-  const result = await pool.query(
+  const result = await query.query(
     `INSERT INTO transactions
      (payee_id, booking_date, operation_date, amount, raw_data, category_id, import_batch_id, source_type, original_amount, original_currency, pln_equivalent)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)

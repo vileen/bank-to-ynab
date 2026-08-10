@@ -224,20 +224,22 @@ router.delete('/:sessionId', async (req, res) => {
  * Body: { importBatchId, sessionId, transactions: Array }
  */
 router.post('/confirm', async (req, res) => {
+  let client;
   try {
     const { importBatchId, sessionId, transactions } = req.body;
     if (!Array.isArray(transactions) || transactions.length === 0) {
       return res.status(400).json({ error: 'No transactions to confirm' });
     }
 
+    client = await db.pool.connect();
+    await client.query('BEGIN');
+
     const importedTransactions = [];
-    const duplicates = [];
-    let duplicateCount = 0;
 
     for (const tx of transactions) {
       const payeeName = tx.payee || 'Unknown';
       const normalizedName = normalizePayeeName(payeeName);
-      const payee = await db.getOrCreatePayee(payeeName, normalizedName);
+      const payee = await db.getOrCreatePayee(payeeName, normalizedName, client);
 
       const amountForDb = tx.plnEquivalent !== null && tx.plnEquivalent !== undefined
         ? tx.plnEquivalent
@@ -267,30 +269,25 @@ router.post('/confirm', async (req, res) => {
         originalAmount: tx.originalAmount,
         originalCurrency: tx.originalCurrency,
         plnEquivalent: tx.plnEquivalent,
-        skipDuplicateCheck: true
+        skipDuplicateCheck: true,
+        client
       });
 
-      if (transaction.isDuplicate) {
-        duplicateCount++;
-        duplicates.push({
-          payee: payee.name,
-          date: tx.date,
-          amount: amountForDb
-        });
-      } else {
-        importedTransactions.push({
-          id: transaction.id,
-          payee: payee.name,
-          date: tx.date,
-          amount: amountForDb
-        });
-      }
+      importedTransactions.push({
+        id: transaction.id,
+        payee: payee.name,
+        date: tx.date,
+        amount: amountForDb
+      });
     }
 
-    // Auto-kategoryzacja dla nowych payees
+    await client.query('COMMIT');
+    client.release();
+    client = null;
+
+    // Auto-categorization and session cleanup can run outside the transaction
     await db.autoCategorizeTransactions();
 
-    // Oznacz sesję jako potwierdzoną (lub usuń ją)
     if (sessionId) {
       await db.markScreenshotSessionConfirmed(sessionId);
     }
@@ -298,12 +295,16 @@ router.post('/confirm', async (req, res) => {
     res.json({
       success: true,
       importedTransactions: importedTransactions.length,
-      duplicateCount,
-      duplicates,
+      duplicateCount: 0,
+      duplicates: [],
       importBatchId,
       sessionId: sessionId || null
     });
   } catch (error) {
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (rollbackErr) {}
+      client.release();
+    }
     console.error('Screenshot confirm error:', error);
     res.status(500).json({ error: error.message });
   }
