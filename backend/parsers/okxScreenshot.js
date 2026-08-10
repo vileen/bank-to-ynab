@@ -109,7 +109,7 @@ function isAddLine(line) {
   return /\bADD\b/i.test(line);
 }
 
-function isUSDGLine(line) {
+function containsUSDG(line) {
   return /USDG/i.test(line) || /Multi-crypto/i.test(line);
 }
 
@@ -154,74 +154,54 @@ function extractPayeeAndAmount(line) {
  */
 function parseOCRText(ocrText) {
   const lines = ocrText
-    .split('\n')
+    .split(/\r?\n/)
     .map(l => l.trim())
     .filter(l => l.length > 0);
 
   const transactions = [];
   let currentDate = null;
-  let pendingReward = null;
-  let pendingExpense = null;
-  let lineIndex = 0;
 
-  // Zamyka oczekującą transakcję nagrody poprzez przypisanie daty i dodanie do listy
-  function flushPendingReward(date) {
-    if (pendingReward) {
-      if (!pendingReward.date && date) pendingReward.date = date;
-      transactions.push(pendingReward);
-      pendingReward = null;
-    }
-  }
-
-  // Zamyka oczekujący wydatek poprzez przypisanie daty i dodanie do listy
-  function flushPendingExpense(date) {
-    if (pendingExpense) {
-      if (!pendingExpense.date && date) pendingExpense.date = date;
-      transactions.push(pendingExpense);
-      pendingExpense = null;
-    }
-  }
-
-  // Zwraca ostatnią otwartą (oczekującą lub już dodaną) transakcję do której można przypisać USDG
-  function getLastOpenTransaction() {
-    if (pendingExpense) return pendingExpense;
-    if (pendingReward) return pendingReward;
+  function getLastTransaction() {
     if (transactions.length > 0) return transactions[transactions.length - 1];
     return null;
   }
 
-  while (lineIndex < lines.length) {
-    const line = lines[lineIndex];
+  function attachUSDGToLastTransaction(usdg) {
+    if (!usdg) return;
+    const lastTx = getLastTransaction();
+    if (!lastTx) return;
+    lastTx.usdgAmount = usdg.value;
+    lastTx.usdgRaw = usdg.raw;
+  }
 
-    // Data ustawia kontekst dla kolejnych linii i zamyka oczekujące transakcje
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Data-only line sets context for subsequent transactions.
+    // Date + USDG line is treated as a detail line for the immediately preceding transaction.
     if (isDateLine(line)) {
       const parsedDate = extractDateFromLine(line);
-      flushPendingReward(parsedDate);
-      flushPendingExpense(parsedDate);
-      currentDate = parsedDate;
 
-      // Linię daty może zawierać też kwotę USDG, np. "Jul 30, 2026 +0.36 USDG"
-      if (isUSDGLine(line)) {
+      if (containsUSDG(line)) {
         const usdg = extractUSDG(line);
-        if (usdg) {
-          const lastTx = getLastOpenTransaction();
-          if (lastTx) {
-            lastTx.usdgAmount = usdg.value;
-            lastTx.usdgRaw = usdg.raw;
-          }
+        const lastTx = getLastTransaction();
+        if (lastTx) {
+          attachUSDGToLastTransaction(usdg);
+          if (!lastTx.date) lastTx.date = parsedDate;
+        } else {
+          currentDate = parsedDate;
         }
+      } else {
+        currentDate = parsedDate;
       }
-
-      lineIndex++;
       continue;
     }
 
-    // Card rewards - cashback
+    // Card rewards - cashback.
     if (isCardRewardsLine(line)) {
-      flushPendingReward(); // zamknij poprzednią nagrodę jeśli jest
       const extracted = extractCurrencyAmount(line);
       if (extracted) {
-        pendingReward = {
+        transactions.push({
           date: currentDate,
           payee: 'OKX Card Rewards',
           type: 'cashback',
@@ -229,30 +209,21 @@ function parseOCRText(ocrText) {
           originalCurrency: extracted.currency,
           rawAmount: extracted.raw,
           usdgAmount: null,
+          usdgRaw: null,
           confidence: 0.85
-        };
+        });
       }
-      lineIndex++;
       continue;
     }
 
-    // USDG line - kwota w USDG, może być powiązana z poprzednią transakcją lub nagrodą
-    if (isUSDGLine(line)) {
+    // Standalone USDG detail line - attach to immediately preceding transaction.
+    if (containsUSDG(line)) {
       const usdg = extractUSDG(line);
-      if (usdg) {
-        if (pendingReward) {
-          pendingReward.usdgAmount = usdg.value;
-          pendingReward.usdgRaw = usdg.raw;
-        } else if (pendingExpense) {
-          pendingExpense.usdgAmount = usdg.value;
-          pendingExpense.usdgRaw = usdg.raw;
-        }
-      }
-      lineIndex++;
+      attachUSDGToLastTransaction(usdg);
       continue;
     }
 
-    // ADD - zasilenie konta (zawsze inflow, ignoruj znak minusa z OCR)
+    // ADD - account top-up (always inflow, ignore minus sign from OCR)
     if (isAddLine(line)) {
       const extracted = extractCurrencyAmount(line);
       if (extracted) {
@@ -280,16 +251,14 @@ function parseOCRText(ocrText) {
           confidence: 0.5
         });
       }
-      lineIndex++;
       continue;
     }
 
-    // Główna transakcja wydatku
+    // Expense transaction.
     if (hasCurrencyAmount(line)) {
-      flushPendingExpense(); // zamknij poprzedni wydatek jeśli jest
       const extracted = extractPayeeAndAmount(line);
       if (extracted) {
-        pendingExpense = {
+        transactions.push({
           date: currentDate,
           payee: extracted.payee,
           type: 'expense',
@@ -299,19 +268,11 @@ function parseOCRText(ocrText) {
           usdgAmount: null,
           usdgRaw: null,
           confidence: 0.8
-        };
+        });
       }
-      lineIndex++;
       continue;
     }
-
-    // Nieznana linia - pomiń
-    lineIndex++;
   }
-
-  // Na końcu zamknij wszystkie oczekujące transakcje
-  flushPendingReward();
-  flushPendingExpense();
 
   return {
     transactions,

@@ -102,3 +102,43 @@ Jul 30, 2026 +0.60 USDG`;
   assert.strictEqual(result.transactions.length, 1);
   assert.strictEqual(result.transactions[0].type, 'cashback');
 });
+
+test('preserves OCR order when expense precedes cashback', () => {
+  const ocrText = `= STARBUCKS (NSR) -zł33.00
+Jul 30, 2026 -8.8 USDG
+G Card rewards +€0.31
+Jul 30, 2026 +0.36 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 2);
+
+  assert.strictEqual(result.transactions[0].type, 'expense');
+  assert.strictEqual(result.transactions[0].payee, 'STARBUCKS (NSR)');
+  assert.strictEqual(result.transactions[0].date, '2026-07-30');
+  assert.strictEqual(result.transactions[0].usdgAmount, -8.8);
+
+  assert.strictEqual(result.transactions[1].type, 'cashback');
+  assert.strictEqual(result.transactions[1].payee, 'OKX Card Rewards');
+  assert.strictEqual(result.transactions[1].date, '2026-07-30');
+  assert.strictEqual(result.transactions[1].usdgAmount, 0.36);
+});
+
+test('keeps cashback immediately after paired expense across multiple transactions', () => {
+  const ocrText = `= LIDL 1671 -zt45.60
+Jul 31, 2026 -10.12 USDG
+G Card rewards +€0.29
+Jul 31, 2026 +0.34 USDG
+= ORLEN 1234 -zł120.00
+Jul 31, 2026 -25.00 USDG
+G Card rewards +€0.50
+Jul 31, 2026 +0.60 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 4);
+  assert.deepStrictEqual(result.transactions.map(t => t.payee), [
+    'LIDL 1671',
+    'OKX Card Rewards',
+    'ORLEN 1234',
+    'OKX Card Rewards'
+  ]);
+});
