@@ -94,6 +94,40 @@ test('returns empty result for empty OCR text', () => {
   assert.strictEqual(result.confidence.average, 0);
 });
 
+test('adds USDG top-up as topup transaction', () => {
+  const ocrText = `Add $100.00 USDG
+Jul 9, 2026 +100.00 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 1);
+  const topup = result.transactions[0];
+  assert.strictEqual(topup.type, 'topup');
+  assert.strictEqual(topup.payee, 'OKX Account Top-Up');
+  assert.strictEqual(topup.originalAmount, 100.00);
+  assert.strictEqual(topup.originalCurrency, 'USD');
+  assert.strictEqual(topup.date, '2026-07-09');
+  assert.strictEqual(topup.usdgAmount, 100.00);
+});
+
+test('skips Add Pay Boost rewards', () => {
+  const ocrText = `= STARBUCKS (NSR) -zł33.00
+Jul 9, 2026 -8.8 USDG
+Add Pay Boost
++$5.00 USDG
+Jul 9, 2026 +5.00 USDG
+G Card rewards +€0.31
+Jul 9, 2026 +0.36 USDG`;
+
+  const result = parseOCRText(ocrText);
+  const payees = result.transactions.map(t => t.payee);
+  assert.ok(!payees.includes('OKX Account Top-Up'), 'Pay Boost should not be imported as top-up');
+  assert.strictEqual(result.transactions.length, 2);
+  assert.strictEqual(result.transactions[0].payee, 'STARBUCKS (NSR)');
+  assert.strictEqual(result.transactions[0].usdgAmount, -8.8);
+  assert.strictEqual(result.transactions[1].payee, 'OKX Card Rewards');
+  assert.strictEqual(result.transactions[1].usdgAmount, 0.36);
+});
+
 test('orphan cashback at end of file is still imported', () => {
   const ocrText = `G Card rewards +€0.50
 Jul 30, 2026 +0.60 USDG`;

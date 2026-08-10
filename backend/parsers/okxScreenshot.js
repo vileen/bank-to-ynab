@@ -106,7 +106,11 @@ function isCardRewardsLine(line) {
 }
 
 function isAddLine(line) {
-  return /\bADD\b/i.test(line);
+  return /\bADD\b/i.test(line) && !/pay\s*boost/i.test(line);
+}
+
+function isPayBoostLine(line) {
+  return /pay\s*boost/i.test(line);
 }
 
 function containsUSDG(line) {
@@ -160,6 +164,7 @@ function parseOCRText(ocrText) {
 
   const transactions = [];
   let currentDate = null;
+  let inSkipBlock = false;
 
   function getLastTransaction() {
     if (transactions.length > 0) return transactions[transactions.length - 1];
@@ -184,12 +189,17 @@ function parseOCRText(ocrText) {
 
       if (containsUSDG(line)) {
         const usdg = extractUSDG(line);
-        const lastTx = getLastTransaction();
-        if (lastTx) {
-          attachUSDGToLastTransaction(usdg);
-          if (!lastTx.date) lastTx.date = parsedDate;
+        if (inSkipBlock) {
+          // Skip USDG detail lines belonging to ignored Pay Boost block.
+          continue;
         } else {
-          currentDate = parsedDate;
+          const lastTx = getLastTransaction();
+          if (lastTx) {
+            attachUSDGToLastTransaction(usdg);
+            if (!lastTx.date) lastTx.date = parsedDate;
+          } else {
+            currentDate = parsedDate;
+          }
         }
       } else {
         currentDate = parsedDate;
@@ -197,34 +207,16 @@ function parseOCRText(ocrText) {
       continue;
     }
 
-    // Card rewards - cashback.
-    if (isCardRewardsLine(line)) {
-      const extracted = extractCurrencyAmount(line);
-      if (extracted) {
-        transactions.push({
-          date: currentDate,
-          payee: 'OKX Card Rewards',
-          type: 'cashback',
-          originalAmount: extracted.amount,
-          originalCurrency: extracted.currency,
-          rawAmount: extracted.raw,
-          usdgAmount: null,
-          usdgRaw: null,
-          confidence: 0.85
-        });
-      }
+    // Skip Pay Boost rewards - they are not real transactions.
+    if (isPayBoostLine(line)) {
+      inSkipBlock = true;
       continue;
     }
 
-    // Standalone USDG detail line - attach to immediately preceding transaction.
-    if (containsUSDG(line)) {
-      const usdg = extractUSDG(line);
-      attachUSDGToLastTransaction(usdg);
-      continue;
-    }
-
-    // ADD - account top-up (always inflow, ignore minus sign from OCR)
+    // ADD - account top-up (always inflow, ignore minus sign from OCR).
+    // Must be checked before standalone USDG so "Add $100 USDG" is parsed as a top-up.
     if (isAddLine(line)) {
+      inSkipBlock = false;
       const extracted = extractCurrencyAmount(line);
       if (extracted) {
         transactions.push({
@@ -254,8 +246,37 @@ function parseOCRText(ocrText) {
       continue;
     }
 
+    // Standalone USDG detail line - attach to immediately preceding transaction.
+    if (containsUSDG(line)) {
+      if (inSkipBlock) continue;
+      const usdg = extractUSDG(line);
+      attachUSDGToLastTransaction(usdg);
+      continue;
+    }
+
+    // Card rewards - cashback.
+    if (isCardRewardsLine(line)) {
+      inSkipBlock = false;
+      const extracted = extractCurrencyAmount(line);
+      if (extracted) {
+        transactions.push({
+          date: currentDate,
+          payee: 'OKX Card Rewards',
+          type: 'cashback',
+          originalAmount: extracted.amount,
+          originalCurrency: extracted.currency,
+          rawAmount: extracted.raw,
+          usdgAmount: null,
+          usdgRaw: null,
+          confidence: 0.85
+        });
+      }
+      continue;
+    }
+
     // Expense transaction.
     if (hasCurrencyAmount(line)) {
+      inSkipBlock = false;
       const extracted = extractPayeeAndAmount(line);
       if (extracted) {
         transactions.push({
