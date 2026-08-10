@@ -5,6 +5,7 @@ const axios = require('axios');
 const path = require('path');
 const db = require('./db');
 const screenshotsRoutes = require('./routes/screenshots');
+const fxService = require('./services/fxService');
 
 const app = express();
 const PORT = process.env.PORT || 3003;
@@ -121,8 +122,22 @@ app.get('/api/budgets/:budgetId/accounts', async (req, res) => {
   }
 });
 
-// Create transactions
-app.post('/api/budgets/:budgetId/transactions', async (req, res) => {
+// Get FX rate for currency and date
+app.get('/api/fx-rate', async (req, res) => {
+  try {
+    const { currency, date, previousDay } = req.query;
+    if (!currency || !date) {
+      return res.status(400).json({ error: 'currency and date are required' });
+    }
+    const rate = previousDay === 'true'
+      ? await fxService.getPreviousDayRate(currency, date)
+      : await fxService.getRateForDate(currency, date);
+    res.json({ currency, date, rate });
+  } catch (error) {
+    console.error('FX rate error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
   try {
     const { budgetId } = req.params;
     const { transactions } = req.body;

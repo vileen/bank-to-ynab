@@ -2380,7 +2380,7 @@
             `).join('');
         }
 
-        function updateScreenshotTransactionField(index, field, value) {
+        async function updateScreenshotTransactionField(index, field, value) {
             const tx = screenshotTransactions[index];
             if (!tx) return;
 
@@ -2395,6 +2395,27 @@
             // Synchronizuj amount z plnEquivalent dla reszty aplikacji
             if (field === 'plnEquivalent' && tx.plnEquivalent !== null) {
                 tx.amount = tx.plnEquivalent;
+            }
+
+            // Przelicz PLN ekw. po zmianie waluty lub kwoty oryginalnej
+            if ((field === 'originalCurrency' || field === 'originalAmount') && tx.originalAmount && tx.date && tx.originalCurrency) {
+                if (tx.originalCurrency === 'PLN') {
+                    tx.plnEquivalent = Math.abs(tx.originalAmount);
+                    tx.amount = tx.plnEquivalent;
+                } else {
+                    try {
+                        const previousDay = tx.type === 'cashback' ? 'true' : 'false';
+                        const rateData = await apiGet(`/fx-rate?currency=${encodeURIComponent(tx.originalCurrency)}&date=${encodeURIComponent(tx.date)}&previousDay=${previousDay}`);
+                        if (rateData.rate !== null) {
+                            tx.plnEquivalent = Math.abs(tx.originalAmount) * rateData.rate;
+                            tx.amount = tx.plnEquivalent;
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch FX rate:', err);
+                    }
+                }
+                renderScreenshotReviewTable();
+                updateScreenshotStats();
             }
 
             updateScreenshotStats();
