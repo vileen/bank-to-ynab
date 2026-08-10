@@ -138,6 +138,9 @@ app.get('/api/fx-rate', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+// Create transactions
+app.post('/api/budgets/:budgetId/transactions', async (req, res) => {
   try {
     const { budgetId } = req.params;
     const { transactions } = req.body;
