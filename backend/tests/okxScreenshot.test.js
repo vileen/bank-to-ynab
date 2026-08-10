@@ -128,6 +128,31 @@ Jul 9, 2026 +0.36 USDG`;
   assert.strictEqual(result.transactions[1].usdgAmount, 0.36);
 });
 
+test('backfills dateless transactions when date-only line appears later', () => {
+  const ocrText = `= STARBUCKS (NSR) -zł33.00
++0.36 USDG
+Jul 30, 2026
+G Card rewards +€0.31
++0.36 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 2);
+  assert.strictEqual(result.transactions[0].date, '2026-07-30');
+  assert.strictEqual(result.transactions[0].payee, 'STARBUCKS (NSR)');
+  assert.strictEqual(result.transactions[1].date, '2026-07-30');
+  assert.strictEqual(result.transactions[1].payee, 'OKX Card Rewards');
+});
+
+test('handles OCR date without space after comma and full month name', () => {
+  const ocrText = `July 30,2026
+= STARBUCKS (NSR) -zł33.00
+Jul 30, 2026 -8.8 USDG`;
+
+  const result = parseOCRText(ocrText);
+  assert.strictEqual(result.transactions.length, 1);
+  assert.strictEqual(result.transactions[0].date, '2026-07-30');
+});
+
 test('orphan cashback at end of file is still imported', () => {
   const ocrText = `G Card rewards +€0.50
 Jul 30, 2026 +0.60 USDG`;

@@ -4,11 +4,21 @@
  */
 
 const MONTHS = {
-  jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
-  jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+  jan: '01', january: '01',
+  feb: '02', february: '02',
+  mar: '03', march: '03',
+  apr: '04', april: '04',
+  may: '05',
+  jun: '06', june: '06',
+  jul: '07', july: '07',
+  aug: '08', august: '08',
+  sep: '09', sept: '09', september: '09',
+  oct: '10', october: '10',
+  nov: '11', november: '11',
+  dec: '12', december: '12'
 };
 
-const DATE_RE = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{1,2}),\s+(\d{4})/i;
+const DATE_RE = /(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+(\d{1,2}),\s*(\d{4})/i;
 
 // Wyrażenia do wykrywania kwot z symbolami walut.
 // Obsługujemy: zł, zt (OCR artefakt), €, $, USDG, Multi-crypto
@@ -202,7 +212,11 @@ function parseOCRText(ocrText) {
           }
         }
       } else {
+        // Date-only line sets context and backfills any preceding dateless transactions.
         currentDate = parsedDate;
+        for (const tx of transactions) {
+          if (!tx.date) tx.date = parsedDate;
+        }
       }
       continue;
     }
