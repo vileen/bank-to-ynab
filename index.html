@@ -754,6 +754,9 @@
                             <span id="selectedCount">0</span> zaznaczonych
                         </label>
                         <span id="lastExportDate" style="color: #e94560; font-size: 13px; font-weight: 500;"></span>
+                        <button class="btn btn-danger" onclick="deleteSelectedTransactions()" id="deleteSelectedBtn">
+                            🗑️ Usuń zaznaczone
+                        </button>
                         <button class="btn" onclick="exportToYNAB()" id="exportBtn" disabled>
                             📥 Eksportuj do YNAB
                         </button>
@@ -2011,17 +2014,41 @@
             document.getElementById('exportBtn').disabled = !accountId || !hasSelected;
         }
         
-        async function deleteTransactionById(id, index) {
-            if (!confirm('Usunąć tę transakcję?')) return;
-            try {
-                await apiDelete(`/transactions/${id}`);
-                selectedTransactions.delete(id);
-                allTransactions.splice(index, 1);
-                renderTransactionsTable();
-                updateExportButton();
-            } catch (err) {
-                alert('❌ Błąd usuwania: ' + (err.message || 'Unknown error'));
+        async function deleteSelectedTransactions() {
+            if (selectedTransactions.size === 0) return;
+            
+            if (!confirm(`Usunąć ${selectedTransactions.size} zaznaczone transakcje?`)) {
+                return;
             }
+            
+            const idsToDelete = Array.from(selectedTransactions);
+            const deleteBtn = document.getElementById('deleteSelectedBtn');
+            const originalText = deleteBtn.textContent;
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = '⏳ Usuwanie...';
+            
+            let deleted = 0;
+            let failed = 0;
+            
+            for (const id of idsToDelete) {
+                try {
+                    await apiDelete(`/transactions/${id}`);
+                    deleted++;
+                } catch (err) {
+                    failed++;
+                    console.error(`Failed to delete transaction ${id}:`, err);
+                }
+            }
+            
+            deleteBtn.disabled = false;
+            deleteBtn.textContent = originalText;
+            
+            if (failed > 0) {
+                alert(`Usunięto ${deleted} transakcji, ${failed} nie powiodło się.`);
+            }
+            
+            selectedTransactions.clear();
+            await loadUnexportedTransactions();
         }
         
         // === Transaction Category Dropdown Functions ===
