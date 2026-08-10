@@ -298,21 +298,24 @@ async function createTransaction(payeeId, bookingDate, operationDate, amount, ra
     sourceType: sType,
     originalAmount: oAmt,
     originalCurrency: oCurr,
-    plnEquivalent: plnEq
+    plnEquivalent: plnEq,
+    skipDuplicateCheck
   } = params;
 
-  // Check if this exact transaction already exists
-  const checkResult = await pool.query(
-    `SELECT * FROM transactions
-     WHERE payee_id = $1 AND booking_date = $2 AND amount = $3
-     AND (import_batch_id = $4 OR import_batch_id IS NULL)`,
-    [pId, bDate, amt, batchId]
-  );
+  if (!skipDuplicateCheck) {
+    // Check if this exact transaction already exists
+    const checkResult = await pool.query(
+      `SELECT * FROM transactions
+       WHERE payee_id = $1 AND booking_date = $2 AND amount = $3
+       AND (import_batch_id = $4 OR import_batch_id IS NULL)`,
+      [pId, bDate, amt, batchId]
+    );
 
-  if (checkResult.rows.length > 0) {
-    const existing = checkResult.rows[0];
-    // Already exists — treat as duplicate
-    return { ...existing, isDuplicate: true };
+    if (checkResult.rows.length > 0) {
+      const existing = checkResult.rows[0];
+      // Already exists — treat as duplicate
+      return { ...existing, isDuplicate: true };
+    }
   }
 
   const result = await pool.query(

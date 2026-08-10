@@ -266,7 +266,8 @@ router.post('/confirm', async (req, res) => {
         sourceType: 'okx-screenshot',
         originalAmount: tx.originalAmount,
         originalCurrency: tx.originalCurrency,
-        plnEquivalent: tx.plnEquivalent
+        plnEquivalent: tx.plnEquivalent,
+        skipDuplicateCheck: true
       });
 
       if (transaction.isDuplicate) {
