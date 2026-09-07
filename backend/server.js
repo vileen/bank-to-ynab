@@ -67,6 +67,10 @@ app.use('/api', (req, res, next) => {
 // Screenshot import routes (mounted under /api/import/screenshots)
 app.use('/api/import/screenshots', screenshotsRoutes);
 
+// OKX PDF statement import routes
+const okxPdfRoutes = require('./routes/okxPdf');
+app.use('/api/import/okx-pdf', okxPdfRoutes);
+
 // Helper: YNAB API client
 const ynabApi = axios.create({
   baseURL: YNAB_BASE_URL,

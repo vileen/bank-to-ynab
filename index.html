@@ -649,6 +649,9 @@
         <button class="tab active" onclick="showTab('import')" id="tab-import">
             📥 Import
         </button>
+        <button class="tab" onclick="showTab('okxpdf')" id="tab-okxpdf">
+            📄 OKX PDF
+        </button>
         <button class="tab" onclick="showTab('screenshots')" id="tab-screenshots">
             📸 Screenshots
         </button>
@@ -852,6 +855,85 @@
                             </tr>
                         </thead>
                         <tbody id="screenshotReviewTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- OKX PDF Tab -->
+    <div id="okxpdfTab" class="tab-content hidden">
+        <div class="card">
+            <h3>📄 Import z PDF OKX (Card Statement)</h3>
+            <p style="color: #888; margin-bottom: 15px;">
+                Wybierz miesięczny statement PDF z karty OKX. Parser wyciągnie transakcje, 
+                przeliczy waluty na PLN i pozwoli zweryfikować przed zapisaniem.
+            </p>
+            <label class="upload-area" id="okxPdfDropZone">
+                <input type="file" id="okxPdfInput" accept=".pdf" onchange="handleOkxPdf(event)">
+                <p style="font-size: 24px; margin-bottom: 10px;">📄</p>
+                <p><strong>Kliknij lub przeciągnij plik PDF</strong></p>
+                <p style="color: #888; font-size: 12px; margin-top: 10px;">
+                    Miesięczny statement z OKX (np. card-stmt-monthly-...pdf)
+                </p>
+            </label>
+            <div id="okxPdfProgress" class="hidden" style="margin-top: 15px; color: #888;">
+                ⏳ Przetwarzanie PDF...
+            </div>
+            <div id="okxPdfError" class="hidden" style="margin-top: 15px; color: #e74c3c;"></div>
+        </div>
+
+        <div id="okxPdfReviewArea" class="hidden">
+            <div class="card">
+                <div class="section-header">
+                    <h3>🔍 Weryfikacja transakcji z PDF</h3>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <span style="color: #888; font-size: 13px;" id="okxPdfSessionInfo"></span>
+                        <span style="color: #888; font-size: 13px;">
+                            <span id="okxPdfReviewCount">0</span> transakcji do importu
+                        </span>
+                        <button class="btn btn-secondary" onclick="clearOkxPdfSession()" id="okxPdfClearBtn">
+                            🗑️ Wyczyść
+                        </button>
+                        <button class="btn" onclick="confirmOkxPdfImport()" id="okxPdfConfirmBtn">
+                            ✅ Zapisz do bazy
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats" style="margin-bottom: 15px;">
+                    <div class="stat-box">
+                        <div class="stat-value" id="okxPdfTotalCount">0</div>
+                        <div class="stat-label">Wszystkie</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="okxPdfSuccessCount">0</div>
+                        <div class="stat-label">Sukces</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="okxPdfFailedCount">0</div>
+                        <div class="stat-label">Błędy</div>
+                    </div>
+                </div>
+
+                <div class="screenshot-table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Payee</th>
+                                <th>Typ</th>
+                                <th>Kwota oryg.</th>
+                                <th>Waluta</th>
+                                <th>Kurs</th>
+                                <th>PLN ekw.</th>
+                                <th>Status</th>
+                                <th>Kategoria</th>
+                                <th>Akcje</th>
+                            </tr>
+                        </thead>
+                        <tbody id="okxPdfReviewTable"></tbody>
                     </table>
                 </div>
             </div>
@@ -2639,6 +2721,124 @@
             checkConnection();
         }
 
+
+        // === OKX PDF Import ===
+        let okxPdfTransactions = [];
+        let okxPdfSessionId = null;
+
+        function handleOkxPdf(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const progressEl = document.getElementById('okxPdfProgress');
+            const errorEl = document.getElementById('okxPdfError');
+            const reviewArea = document.getElementById('okxPdfReviewArea');
+
+            progressEl.classList.remove('hidden');
+            errorEl.classList.add('hidden');
+            reviewArea.classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('pdf', file);
+
+            fetch(`${API_BASE}/api/import/okx-pdf`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` },
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                progressEl.classList.add('hidden');
+                if (!data.success) {
+                    errorEl.textContent = data.error || 'Błąd przetwarzania PDF';
+                    errorEl.classList.remove('hidden');
+                    return;
+                }
+                okxPdfTransactions = data.transactions || [];
+                okxPdfSessionId = data.importBatchId;
+                renderOkxPdfReview();
+                reviewArea.classList.remove('hidden');
+            })
+            .catch(err => {
+                progressEl.classList.add('hidden');
+                errorEl.textContent = 'Błąd sieci: ' + err.message;
+                errorEl.classList.remove('hidden');
+            });
+        }
+
+        function renderOkxPdfReview() {
+            const tbody = document.getElementById('okxPdfReviewTable');
+            const countEl = document.getElementById('okxPdfReviewCount');
+            const totalEl = document.getElementById('okxPdfTotalCount');
+            const successEl = document.getElementById('okxPdfSuccessCount');
+            const failedEl = document.getElementById('okxPdfFailedCount');
+            const infoEl = document.getElementById('okxPdfSessionInfo');
+
+            const total = okxPdfTransactions.length;
+            const success = okxPdfTransactions.filter(t => t.status === 'success').length;
+            const failed = okxPdfTransactions.filter(t => t.status === 'error').length;
+
+            countEl.textContent = total;
+            totalEl.textContent = total;
+            successEl.textContent = success;
+            failedEl.textContent = failed;
+            infoEl.textContent = okxPdfSessionId ? `Batch: ${okxPdfSessionId.slice(0, 20)}...` : '';
+
+            tbody.innerHTML = okxPdfTransactions.map((t, i) => `
+                <tr>
+                    <td>${escapeHtml(t.date)}</td>
+                    <td>${escapeHtml(t.payee || '')}</td>
+                    <td>${escapeHtml(t.type || '')}</td>
+                    <td>${t.originalAmount !== undefined ? t.originalAmount.toFixed(2) : '-'}</td>
+                    <td>${escapeHtml(t.originalCurrency || '')}</td>
+                    <td>${t.exchangeRate !== undefined ? t.exchangeRate.toFixed(4) : '-'}</td>
+                    <td>${t.plnEquivalent !== undefined ? t.plnEquivalent.toFixed(2) : '-'}</td>
+                    <td><span class="status-badge status-${t.status === 'success' ? 'success' : 'error'}">${t.status === 'success' ? '✅' : '❌'}</span></td>
+                    <td>${escapeHtml(t.category || '')}</td>
+                    <td>${t.status === 'error' ? escapeHtml(t.error || '') : ''}</td>
+                </tr>
+            `).join('');
+        }
+
+        function clearOkxPdfSession() {
+            okxPdfTransactions = [];
+            okxPdfSessionId = null;
+            document.getElementById('okxPdfReviewArea').classList.add('hidden');
+            document.getElementById('okxPdfInput').value = '';
+        }
+
+        function confirmOkxPdfImport() {
+            if (!okxPdfSessionId || okxPdfTransactions.length === 0) return;
+
+            const btn = document.getElementById('okxPdfConfirmBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Zapisywanie...';
+
+            fetch(`${API_BASE}/api/import/confirm`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                },
+                body: JSON.stringify({ importBatchId: okxPdfSessionId })
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = '✅ Zapisz do bazy';
+                if (data.success) {
+                    showNotification(`Zapisano ${data.savedCount || 0} transakcji`, 'success');
+                    clearOkxPdfSession();
+                } else {
+                    showNotification(data.error || 'Błąd zapisu', 'error');
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.textContent = '✅ Zapisz do bazy';
+                showNotification('Błąd sieci: ' + err.message, 'error');
+            });
+        }
         // === Utilities ===
         function escapeHtml(text) {
             if (!text) return '';
