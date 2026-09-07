@@ -2743,7 +2743,7 @@
 
             fetch(`${API_BASE}/import/okx-pdf`, {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token') || ''}` },
+                headers: { 'Authorization': `Bearer ${getAuthToken()}` },
                 body: formData
             })
             .then(r => r.json())
@@ -2818,7 +2818,7 @@
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                    'Authorization': `Bearer ${getAuthToken()}`
                 },
                 body: JSON.stringify({ importBatchId: okxPdfSessionId })
             })
