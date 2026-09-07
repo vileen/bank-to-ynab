@@ -1419,6 +1419,13 @@
                     dd.classList.remove('active');
                 }
             });
+
+            // Close OKX PDF review dropdowns
+            document.querySelectorAll('#okxPdfReviewTable .searchable-select-dropdown').forEach(dd => {
+                if (!dd.parentElement.contains(e.target)) {
+                    dd.classList.remove('active');
+                }
+            });
         });
         
         // === Payee Category Dropdown Functions ===
@@ -2785,19 +2792,114 @@
             infoEl.textContent = okxPdfSessionId ? `Batch: ${okxPdfSessionId.slice(0, 20)}...` : '';
 
             tbody.innerHTML = okxPdfTransactions.map((t, i) => `
-                <tr>
-                    <td>${escapeHtml(t.date)}</td>
-                    <td>${escapeHtml(t.payee || '')}</td>
-                    <td>${escapeHtml(t.type || '')}</td>
-                    <td>${t.originalAmount !== undefined ? t.originalAmount.toFixed(2) : '-'}</td>
-                    <td>${escapeHtml(t.originalCurrency || '')}</td>
-                    <td>${t.exchangeRate !== undefined ? t.exchangeRate.toFixed(4) : '-'}</td>
-                    <td>${t.plnEquivalent !== undefined ? t.plnEquivalent.toFixed(2) : '-'}</td>
+                <tr data-pdf-index="${i}">
+                    <td><input type="date" class="screenshot-edit-input" value="${escapeHtml(t.date || '')}" onchange="updateOkxPdfTransactionField(${i}, 'date', this.value)"></td>
+                    <td><input type="text" class="screenshot-edit-input" value="${escapeHtml(t.payee || '')}" onchange="updateOkxPdfTransactionField(${i}, 'payee', this.value)"></td>
+                    <td>
+                        <select class="screenshot-edit-select" onchange="updateOkxPdfTransactionField(${i}, 'type', this.value)">
+                            <option value="expense" ${t.type === 'expense' ? 'selected' : ''}>expense</option>
+                            <option value="cashback" ${t.type === 'cashback' ? 'selected' : ''}>cashback</option>
+                            <option value="topup" ${t.type === 'topup' ? 'selected' : ''}>topup</option>
+                            <option value="refund" ${t.type === 'refund' ? 'selected' : ''}>refund</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.01" class="screenshot-edit-input" value="${t.originalAmount !== null && t.originalAmount !== undefined ? t.originalAmount : ''}" onchange="updateOkxPdfTransactionField(${i}, 'originalAmount', this.value)"></td>
+                    <td>
+                        <select class="screenshot-edit-select" onchange="updateOkxPdfTransactionField(${i}, 'originalCurrency', this.value)">
+                            <option value="PLN" ${t.originalCurrency === 'PLN' ? 'selected' : ''}>PLN</option>
+                            <option value="USD" ${t.originalCurrency === 'USD' ? 'selected' : ''}>USD</option>
+                            <option value="EUR" ${t.originalCurrency === 'EUR' ? 'selected' : ''}>EUR</option>
+                            <option value="GBP" ${t.originalCurrency === 'GBP' ? 'selected' : ''}>GBP</option>
+                            <option value="CHF" ${t.originalCurrency === 'CHF' ? 'selected' : ''}>CHF</option>
+                        </select>
+                    </td>
+                    <td><input type="number" step="0.0001" class="screenshot-edit-input" value="${t.exchangeRate !== null && t.exchangeRate !== undefined ? t.exchangeRate.toFixed(4) : ''}" onchange="updateOkxPdfTransactionField(${i}, 'exchangeRate', this.value)"></td>
+                    <td><input type="number" step="0.01" class="screenshot-edit-input" value="${t.plnEquivalent !== null && t.plnEquivalent !== undefined ? t.plnEquivalent.toFixed(2) : ''}" onchange="updateOkxPdfTransactionField(${i}, 'plnEquivalent', this.value)"></td>
                     <td><span class="status-badge status-${t.status === 'success' ? 'success' : 'error'}">${t.status === 'success' ? '✅' : '❌'}</span></td>
-                    <td>${escapeHtml(t.category || '')}</td>
+                    <td>
+                        <div class="payee-category-select" style="position:relative;">
+                            <input type="text" class="searchable-select-input" style="width:100%;background:#0f3460;border:1px solid #333;color:#fff;padding:6px 8px;border-radius:4px;font-size:13px;cursor:pointer;" 
+                                   value="${escapeHtml(t.categoryName || t.category || '')}" 
+                                   onclick="toggleOkxPdfCategoryDropdown(${i})" 
+                                   readonly>
+                            <div class="searchable-select-dropdown" id="okx-pdf-category-dropdown-${i}" style="position:absolute;top:100%;left:0;right:0;max-height:200px;overflow-y:auto;background:#0f3460;border:1px solid #333;border-top:none;border-radius:0 0 4px 4px;z-index:50;display:none;">
+                                ${ynabCategories.map(cat => `
+                                    <div class="searchable-select-item ${cat.id === (t.categoryId || '') ? 'selected' : ''}" 
+                                         data-value="${cat.id}" 
+                                         onclick="selectOkxPdfCategory(${i}, '${cat.id}', '${escapeHtml(cat.name)}')">
+                                        ${escapeHtml(cat.name)}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </td>
                     <td>${t.status === 'error' ? escapeHtml(t.error || '') : ''}</td>
                 </tr>
             `).join('');
+        }
+
+        async function updateOkxPdfTransactionField(index, field, value) {
+            const tx = okxPdfTransactions[index];
+            if (!tx) return;
+
+            if (field === 'originalAmount' || field === 'plnEquivalent' || field === 'exchangeRate') {
+                tx[field] = value === '' ? null : parseFloat(value);
+            } else if (field === 'categoryId') {
+                tx[field] = value || null;
+            } else {
+                tx[field] = value;
+            }
+
+            // Synchronizuj amount z plnEquivalent dla reszty aplikacji
+            if (field === 'plnEquivalent' && tx.plnEquivalent !== null) {
+                tx.amount = tx.plnEquivalent;
+            }
+
+            // Przelicz PLN ekw. po zmianie waluty, kwoty lub kursu
+            if ((field === 'originalCurrency' || field === 'originalAmount' || field === 'exchangeRate') && tx.originalAmount && tx.date && tx.originalCurrency) {
+                if (tx.originalCurrency === 'PLN') {
+                    tx.plnEquivalent = Math.abs(tx.originalAmount);
+                    tx.amount = tx.plnEquivalent;
+                    tx.exchangeRate = 1;
+                } else if (field === 'exchangeRate' && tx.exchangeRate) {
+                    // Ręczny kurs — przelicz z niego
+                    tx.plnEquivalent = Math.abs(tx.originalAmount) * tx.exchangeRate;
+                    tx.amount = tx.plnEquivalent;
+                } else {
+                    try {
+                        const previousDay = tx.type === 'cashback' ? 'true' : 'false';
+                        const rateData = await apiGet(`/fx-rate?currency=${encodeURIComponent(tx.originalCurrency)}&date=${encodeURIComponent(tx.date)}&previousDay=${previousDay}`);
+                        if (rateData.rate !== null) {
+                            tx.exchangeRate = rateData.rate;
+                            tx.plnEquivalent = Math.abs(tx.originalAmount) * rateData.rate;
+                            tx.amount = tx.plnEquivalent;
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch FX rate:', err);
+                    }
+                }
+                renderOkxPdfReview();
+            }
+        }
+
+        function toggleOkxPdfCategoryDropdown(index) {
+            const dropdown = document.getElementById(`okx-pdf-category-dropdown-${index}`);
+            document.querySelectorAll('#okxPdfReviewTable .searchable-select-dropdown').forEach(dd => {
+                if (dd.id !== `okx-pdf-category-dropdown-${index}`) {
+                    dd.classList.remove('active');
+                }
+            });
+            dropdown.classList.toggle('active');
+        }
+
+        function selectOkxPdfCategory(index, categoryId, categoryName) {
+            const tx = okxPdfTransactions[index];
+            if (!tx) return;
+            tx.categoryId = categoryId;
+            tx.categoryName = categoryName;
+            tx.category = categoryName;
+            document.getElementById(`okx-pdf-category-dropdown-${index}`).classList.remove('active');
+            renderOkxPdfReview();
         }
 
         function clearOkxPdfSession() {
