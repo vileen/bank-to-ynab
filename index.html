@@ -2732,6 +2732,7 @@
         // === OKX PDF Import ===
         let okxPdfTransactions = [];
         let okxPdfSessionId = null;
+        let okxPdfImportBatchId = null;
 
         function handleOkxPdf(event) {
             const file = event.target.files[0];
@@ -2762,7 +2763,8 @@
                     return;
                 }
                 okxPdfTransactions = data.transactions || [];
-                okxPdfSessionId = data.importBatchId;
+                okxPdfImportBatchId = data.importBatchId;
+                okxPdfSessionId = data.sessionId;
                 renderOkxPdfReview();
                 reviewArea.classList.remove('hidden');
             })
@@ -2905,6 +2907,7 @@
         function clearOkxPdfSession() {
             okxPdfTransactions = [];
             okxPdfSessionId = null;
+            okxPdfImportBatchId = null;
             document.getElementById('okxPdfReviewArea').classList.add('hidden');
             document.getElementById('okxPdfInput').value = '';
         }
@@ -2922,23 +2925,27 @@
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${getAuthToken()}`
                 },
-                body: JSON.stringify({ importBatchId: okxPdfSessionId })
+                body: JSON.stringify({ 
+                    importBatchId: okxPdfImportBatchId,
+                    sessionId: okxPdfSessionId,
+                    transactions: okxPdfTransactions 
+                })
             })
             .then(r => r.json())
             .then(data => {
                 btn.disabled = false;
                 btn.textContent = '✅ Zapisz do bazy';
                 if (data.success) {
-                    showNotification(`Zapisano ${data.savedCount || 0} transakcji`, 'success');
+                    alert(`Zapisano ${data.importedTransactions || 0} transakcji`);
                     clearOkxPdfSession();
                 } else {
-                    showNotification(data.error || 'Błąd zapisu', 'error');
+                    alert(data.error || 'Błąd zapisu');
                 }
             })
             .catch(err => {
                 btn.disabled = false;
                 btn.textContent = '✅ Zapisz do bazy';
-                showNotification('Błąd sieci: ' + err.message, 'error');
+                alert('Błąd sieci: ' + err.message);
             });
         }
         // === Utilities ===

@@ -268,7 +268,8 @@ function extractSummary(lines) {
     totalRefund: null,
     totalFees: null,
     netVolume: null,
-    rewardsEarned: null
+    rewardsEarned: null,
+    month: null
   };
 
   for (const line of lines) {
@@ -288,6 +289,13 @@ function extractSummary(lines) {
 
     const rewardsMatch = trimmed.match(/^rewards earned\s+([+-]?\d+\.\d{2})\s+eur/i);
     if (rewardsMatch) summary.rewardsEarned = parseFloat(rewardsMatch[1]);
+
+    // Wyciągnij miesiąc z period summary (np. "August 2025")
+    const periodMatch = trimmed.match(/^period summary\s+([a-z]+)\s+(\d{4})/i);
+    if (periodMatch) {
+      const monthName = periodMatch[1].toLowerCase();
+      summary.month = MONTHS[monthName] || null;
+    }
   }
 
   return summary;
@@ -308,11 +316,41 @@ function deduplicateTransactions(transactions) {
   });
 }
 
+/**
+ * Tworzy transakcję rewards na podstawie summary.
+ * Używa ostatniego dnia miesiąca statementu jako daty transakcji.
+ * @param {Object} summary - Obiekt summary z parsePdfText.
+ * @param {string} statementYear - Rok statementu.
+ * @returns {Object|null} - Transakcja rewards lub null.
+ */
+function createRewardsTransaction(summary, statementYear) {
+  if (!summary.rewardsEarned || summary.rewardsEarned <= 0) return null;
+
+  // Użyj ostatniego dnia miesiąca jako daty rewards
+  // Zakładamy że rewards są za okres statementu
+  const lastDayOfMonth = new Date(parseInt(statementYear), parseInt(summary.month || 12), 0).getDate();
+  const month = (summary.month || '12').padStart(2, '0');
+  const date = `${statementYear}-${month}-${lastDayOfMonth}`;
+
+  return {
+    date,
+    transactionId: `REWARDS-${statementYear}-${month}`,
+    payee: 'OKX Card Rewards',
+    originalAmount: summary.rewardsEarned,
+    originalCurrency: 'EUR',
+    plnAmount: null,
+    type: 'income',
+    raw: `Rewards earned ${summary.rewardsEarned.toFixed(2)} EUR`,
+    isRewards: true
+  };
+}
+
 module.exports = {
   parsePdfText,
   deduplicateTransactions,
   parseMonthDay,
   parseAmount,
   extractSummary,
-  shouldSkipLine
+  shouldSkipLine,
+  createRewardsTransaction
 };

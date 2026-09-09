@@ -71,6 +71,102 @@ app.use('/api/import/screenshots', screenshotsRoutes);
 const okxPdfRoutes = require('./routes/okxPdf');
 app.use('/api/import/okx-pdf', okxPdfRoutes);
 
+/**
+ * POST /api/import/confirm
+ * Generic confirm endpoint - handles both screenshot and PDF imports.
+ * Body: { importBatchId, sessionId, transactions: Array }
+ */
+app.post('/api/import/confirm', async (req, res) => {
+  let client;
+  try {
+    const { importBatchId, sessionId, transactions } = req.body;
+    if (!Array.isArray(transactions) || transactions.length === 0) {
+      return res.status(400).json({ error: 'No transactions to confirm' });
+    }
+
+    // Determine source from importBatchId prefix
+    const source = importBatchId?.startsWith('okx-pdf-') ? 'okx-pdf' :
+                   importBatchId?.startsWith('screenshot-') ? 'okx-screenshot' :
+                   'unknown';
+
+    client = await db.pool.connect();
+    await client.query('BEGIN');
+
+    const importedTransactions = [];
+
+    for (const tx of transactions) {
+      const payeeName = tx.payee || 'Unknown';
+      const normalizedName = normalizePayeeName(payeeName);
+      const payee = await db.getOrCreatePayee(payeeName, normalizedName, client);
+
+      const amountForDb = tx.plnEquivalent !== null && tx.plnEquivalent !== undefined
+        ? tx.plnEquivalent
+        : tx.amount;
+
+      const rawData = {
+        source,
+        originalAmount: tx.originalAmount,
+        originalCurrency: tx.originalCurrency,
+        plnEquivalent: tx.plnEquivalent,
+        exchangeRate: tx.exchangeRate,
+        transactionId: tx.transactionId,
+        type: tx.type,
+        isRewards: tx.isRewards || false
+      };
+
+      const transaction = await db.createTransaction({
+        payeeId: payee.id,
+        bookingDate: tx.date,
+        operationDate: tx.date,
+        amount: amountForDb,
+        rawData,
+        categoryId: tx.categoryId || null,
+        importBatchId,
+        sourceType: source,
+        originalAmount: tx.originalAmount,
+        originalCurrency: tx.originalCurrency,
+        plnEquivalent: tx.plnEquivalent,
+        skipDuplicateCheck: true,
+        client
+      });
+
+      importedTransactions.push({
+        id: transaction.id,
+        payee: payee.name,
+        date: tx.date,
+        amount: amountForDb
+      });
+    }
+
+    await client.query('COMMIT');
+    client.release();
+    client = null;
+
+    await db.autoCategorizeTransactions();
+
+    if (sessionId) {
+      await db.markScreenshotSessionConfirmed(sessionId);
+    }
+
+    res.json({
+      success: true,
+      importedTransactions: importedTransactions.length,
+      duplicateCount: 0,
+      duplicates: [],
+      importBatchId,
+      sessionId: sessionId || null,
+      source
+    });
+  } catch (error) {
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (rollbackErr) {}
+      client.release();
+    }
+    console.error('Import confirm error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Helper: YNAB API client
 const ynabApi = axios.create({
   baseURL: YNAB_BASE_URL,
