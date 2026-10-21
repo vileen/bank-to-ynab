@@ -158,7 +158,10 @@ function parsePdfText(pdfText, statementYear = null) {
     }
 
     // Sprawdź czy to linia z datą (początek nowej transakcji)
-    const dateMatch = line.match(DATE_RE);
+    // Uwaga: pierwsza strona OKX PDF ma wcięcie przed datą (" Aug 5"),
+    // kolejne strony są flush left ("Aug 11") — musimy trimować
+    const trimmedLine = line.trim();
+    const dateMatch = trimmedLine.match(DATE_RE);
 
     if (dateMatch) {
       // Zapisz poprzednią transakcję jeśli istnieje
@@ -166,9 +169,9 @@ function parsePdfText(pdfText, statementYear = null) {
         transactions.push(currentTx);
       }
 
-      // Parsuj nową transakcję
+      // Parsuj nową transakcję — używamy trimmedLine bo dateMatch[0] jest z trimowanego stringa
       const date = parseMonthDay(dateMatch[0], statementYear || '2026');
-      const rest = line.substring(dateMatch[0].length).trimStart();
+      const rest = trimmedLine.substring(dateMatch[0].length).trimStart();
 
       // Znajdź amount na końcu linii (format: -7.23 EUR)
       const amountMatch = rest.match(AMOUNT_RE);

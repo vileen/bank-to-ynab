@@ -366,7 +366,7 @@ app.post('/api/import', async (req, res) => {
       potentialDuplicates: potentialDuplicates.map(pd => ({
         id: pd.id,
         payee: pd.payee_name,
-        date: pd.operation_date || pd.booking_date,
+        date: pd.booking_date,
         amount: pd.amount
       })),
       importBatchId

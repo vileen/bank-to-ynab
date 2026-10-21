@@ -23,8 +23,9 @@ const DATE_RE = /(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?
 // Wyrażenia do wykrywania kwot z symbolami walut.
 // Obsługujemy: zł, zt (OCR artefakt), €, $, USDG, Multi-crypto
 const AMOUNT_RE = /([+-]?\s*[\d\s]+[.,]\d{2}|\+?\d+\.\d+|\-\d+\.\d+)?\s*(zł|zt|€|\$|USDG|Multi-crypto)?/i;
-// Formaty kwot: -zł33.00, +€0.31, 33.00 zł, 33.00zt
-const CURRENCY_AMOUNT_RE = /([+-]?)\s*(zł|zt|€|\$)?\s*([\d\s]+[.,]?\d*)\s*(zł|zt|€|\$)?/gi;
+// Formaty kwot: -zł33.00, +€0.31, 33.00 zł, 33.00zt, -zł1,008.00 (z separatorem tysięcy)
+// Obsługuje przecinek jako separator tysięcy ORAZ kropkę dziesiętną
+const CURRENCY_AMOUNT_RE = /([+-]?)\s*(zł|zt|€|\$)?\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(zł|zt|€|\$)?/gi;
 
 function normalizeCurrencySymbol(symbol) {
   if (!symbol) return null;
@@ -37,9 +38,11 @@ function normalizeCurrencySymbol(symbol) {
 
 function normalizeAmount(amountStr) {
   if (!amountStr) return null;
+  // Usuń spacje, potem przecinki (separator tysięcy), zamień kropkę dziesiętną na kropkę
   return amountStr
     .replace(/\s+/g, '')
-    .replace(',', '.');
+    .replace(/,(?=\d{3}(\D|$))/g, '')  // usuń przecinek jeśli jest separatorem tysięcy
+    .replace(',', '.');  // pozostały przecinek = kropka dziesiętna
 }
 
 function parseAmountNumber(amountStr) {
@@ -282,39 +285,15 @@ function parseOCRText(ocrText) {
       continue;
     }
 
-    // Standalone USDG detail line - attach to immediately preceding transaction.
-    if (containsUSDG(line)) {
-      if (inSkipBlock) continue;
-      const usdg = extractUSDG(line);
-      attachUSDGToLastTransaction(usdg);
-      continue;
-    }
-
-    // Card rewards - cashback.
-    if (isCardRewardsLine(line)) {
-      inSkipBlock = false;
-      const extracted = extractCurrencyAmount(line);
-      if (extracted) {
-        transactions.push({
-          date: currentDate,
-          payee: 'OKX Card Rewards',
-          type: 'cashback',
-          originalAmount: extracted.amount,
-          originalCurrency: extracted.currency,
-          rawAmount: extracted.raw,
-          usdgAmount: null,
-          usdgRaw: null,
-          confidence: 0.85
-        });
-      }
-      continue;
-    }
-
-    // Expense transaction.
+    // Expense transaction (must be checked BEFORE standalone USDG).
+    // Lines like "Amazon.pl -zł1,008.00 -267.85 USDG" are expenses with USDG details,
+    // not standalone USDG detail lines.
     if (hasCurrencyAmount(line)) {
       inSkipBlock = false;
       const extracted = extractPayeeAndAmount(line);
       if (extracted) {
+        // Extract USDG from the same line if present
+        const usdg = containsUSDG(line) ? extractUSDG(line) : null;
         transactions.push({
           date: currentDate,
           payee: extracted.payee,
@@ -322,11 +301,20 @@ function parseOCRText(ocrText) {
           originalAmount: extracted.amount,
           originalCurrency: extracted.currency,
           rawAmount: extracted.raw,
-          usdgAmount: null,
-          usdgRaw: null,
+          usdgAmount: usdg ? usdg.value : null,
+          usdgRaw: usdg ? usdg.raw : null,
           confidence: 0.8
         });
       }
+      continue;
+    }
+
+    // Standalone USDG detail line - attach to immediately preceding transaction.
+    // Only reached if line has NO currency amount (pure USDG detail like "+0.36 USDG").
+    if (containsUSDG(line)) {
+      if (inSkipBlock) continue;
+      const usdg = extractUSDG(line);
+      attachUSDGToLastTransaction(usdg);
       continue;
     }
   }

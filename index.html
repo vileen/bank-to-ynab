@@ -2140,6 +2140,21 @@
             await loadUnexportedTransactions();
         }
         
+        async function deleteTransactionById(id, index) {
+            if (!confirm('Usunąć tę transakcję?')) {
+                return;
+            }
+            
+            try {
+                await apiDelete(`/transactions/${id}`);
+                selectedTransactions.delete(id);
+                await loadUnexportedTransactions();
+            } catch (err) {
+                console.error(`Failed to delete transaction ${id}:`, err);
+                alert('Nie udało się usunąć transakcji. Sprawdź konsolę.');
+            }
+        }
+        
         // === Transaction Category Dropdown Functions ===
         function toggleTxDropdown(index) {
             const dropdown = document.getElementById(`tx-dropdown-${index}`);
